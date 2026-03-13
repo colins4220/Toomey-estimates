@@ -1212,7 +1212,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
         <div className="card">
           <div className="done-header">
             <div className="done-emoji">✅</div>
-            <div className="done-title">Job Submitted!</div>
+            <div className="done-title">{jobType === 'system_recommendations' ? 'Recommendations Submitted!' : 'Job Submitted!'}</div>
             <div className="done-sub">{customer.name} · {today()}</div>
           </div>
           <div className="card-body">
@@ -1283,8 +1283,8 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
           {/* ── Step 0: Photos ─────────────────────────────────────────────── */}
           {step === 0 && <>
             <div>
-              <div className="section-title">Job Photos</div>
-              <div className="section-sub">Tap a photo to mark it up with circles, arrows, and labels.</div>
+              <div className="section-title">{jobType === 'system_recommendations' ? 'Condition Photos' : 'Job Photos'}</div>
+              <div className="section-sub">{jobType === 'system_recommendations' ? 'Document the current system — areas that need upgrading or attention.' : 'Tap a photo to mark it up with circles, arrows, and labels.'}</div>
             </div>
             {photos.length > 0 && (
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
@@ -1321,12 +1321,12 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
           {/* ── Step 1: Materials & Labor ──────────────────────────────────── */}
           {step === 1 && <>
             <div>
-              <div className="section-title">Materials & Labor</div>
-              <div className="section-sub">Search and add parts, then enter hours worked.</div>
+              <div className="section-title">{jobType === 'system_recommendations' ? 'Recommended Upgrades' : 'Materials & Labor'}</div>
+              <div className="section-sub">{jobType === 'system_recommendations' ? 'Add the products and upgrades you\'re recommending for this system.' : 'Search and add parts, then enter hours worked.'}</div>
             </div>
 
             {selectedItems.length > 0 && (
-              <InnerCard title={`🛒 Selected (${selectedItems.length})`}>
+              <InnerCard title={jobType === 'system_recommendations' ? `💡 Recommended (${selectedItems.length})` : `🛒 Selected (${selectedItems.length})`}>
                 {selectedItems.map(item => (
                   <div key={item.product.id} style={{display:'flex',alignItems:'center',gap:8,paddingBottom:10,borderBottom:'1px solid #f1f5f9',marginBottom:10}}>
                     <div style={{flex:1,minWidth:0}}>
@@ -1354,7 +1354,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
               </InnerCard>
             )}
 
-            <InnerCard title="🔍 Add Parts">
+            <InnerCard title={jobType === 'system_recommendations' ? '💡 Add Recommended Products' : '🔍 Add Parts'}>
               <input type="text" value={matSearch} onChange={e=>setMatSearch(e.target.value)} placeholder="Search parts by name or category…"
                 style={{width:'100%',padding:'11px 14px',borderRadius:10,border:'1.5px solid #e2e8f0',fontSize:16,fontFamily:'inherit',marginBottom:10}}
               />
@@ -1405,8 +1405,8 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
           {/* ── Step 2: Review ─────────────────────────────────────────────── */}
           {step === 2 && <>
             <div>
-              <div className="section-title">Review & Submit</div>
-              <div className="section-sub">Confirm everything looks right.</div>
+              <div className="section-title">{jobType === 'system_recommendations' ? 'Review Recommendations' : 'Review & Submit'}</div>
+              <div className="section-sub">{jobType === 'system_recommendations' ? 'Confirm the recommendations before submitting to the office.' : 'Confirm everything looks right.'}</div>
             </div>
             <InnerCard title="👤 Customer">
               <Row label="Name"        value={customer.name} accent />
@@ -1447,7 +1447,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
 
             <InnerCard title="📝 Notes">
               <textarea value={notes} onChange={e=>setNotes(e.target.value)}
-                placeholder="Additional notes for the office or client…" rows={3}
+                placeholder={jobType === 'system_recommendations' ? 'Summary of recommendations — explain why these upgrades are being suggested, condition of current system, priority items, etc.' : 'Additional notes for the office or client…'} rows={3}
                 style={{width:'100%',padding:'12px 14px',borderRadius:12,border:'1.5px solid #e2e8f0',fontSize:15,fontFamily:'inherit',resize:'vertical'}}
               />
             </InnerCard>
@@ -1977,7 +1977,7 @@ function App() {
         />
       );
     }
-    if (jobType === 'revamp' || jobType === 'service_call') {
+    if (jobType === 'revamp' || jobType === 'service_call' || jobType === 'system_recommendations') {
       return (
         <JobFlow
           jobType={jobType}
