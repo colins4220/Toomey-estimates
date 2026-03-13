@@ -285,6 +285,24 @@
 <body>
 <div id="app"></div>
 
+<!-- Firebase -->
+<script type="module">
+import{initializeApp}from'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import{getFirestore,collection,addDoc}from'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+const cfg={apiKey:"AIzaSyCQDkIKg33wi8LZlJmTiGXEUBw_xlbWYBI",authDomain:"toomey-estimator.firebaseapp.com",projectId:"toomey-estimator",storageBucket:"toomey-estimator.firebasestorage.app",messagingSenderId:"1062716214564",appId:"1:1062716214564:web:af169caa9c952ea65ab7b1"};
+const app=initializeApp(cfg);
+const db=getFirestore(app);
+window.TFB={
+  async save(data){
+    try{
+      const ref=await addDoc(collection(db,'estimates'),{...data,createdAt:new Date().toISOString()});
+      console.log('Saved to Firebase:',ref.id);
+      return ref.id;
+    }catch(e){console.error('Firebase save failed:',e);return null;}
+  }
+};
+</script>
+
 <!-- React + Babel (no build step) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -541,6 +559,91 @@ function InnerCard({ title, children }) {
   );
 }
 
+// ── Job type config ───────────────────────────────────────────────────────────
+const JOB_TYPES = [
+  { id: 'new_installation',      label: 'New Installation',      icon: '🌱', color: '#1a3a6b', desc: 'Full system design & estimate' },
+  { id: 'revamp',                label: 'Re-Vamp',                icon: '🔧', color: '#0284c7', desc: 'Upgrade or redesign existing system' },
+  { id: 'service_call',          label: 'Service Call',           icon: '🛠', color: '#0f766e', desc: 'Repairs & troubleshooting' },
+  { id: 'system_recommendations',label: 'System Recommendations', icon: '💡', color: '#6d28d9', desc: 'Upgrade suggestions for existing customers' },
+];
+
+// ── HomeScreen ────────────────────────────────────────────────────────────────
+function HomeScreen({ currentUser, onSelect, onSwitchUser }) {
+  return (
+    <div id="app-inner">
+      <div className="brand">
+        <div className="brand-icon">💧</div>
+        <div style={{flex:1}}>
+          <div className="brand-sub">W.L. Toomey Irrigation</div>
+          <div className="brand-title">Estimate Builder</div>
+        </div>
+        <button
+          onClick={onSwitchUser}
+          style={{padding:'8px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.1)',color:'white',fontSize:12,fontWeight:600,cursor:'pointer',WebkitTapHighlightColor:'transparent'}}
+        >{currentUser.name.split(' ')[0]} ▾</button>
+      </div>
+
+      <div className="card">
+        <div className="card-header" style={{textAlign:'center',padding:'24px 22px 20px'}}>
+          <div style={{fontSize:13,fontWeight:700,color:'rgba(255,255,255,0.65)',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:6}}>
+            {new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}
+          </div>
+          <div style={{fontSize:22,fontWeight:700,color:'white'}}>What are we doing today?</div>
+        </div>
+        <div className="card-body">
+          {JOB_TYPES.map(jt => (
+            <div
+              key={jt.id}
+              onClick={() => onSelect(jt.id)}
+              style={{background:'#f8fafc',borderRadius:16,padding:'18px 20px',cursor:'pointer',border:'2px solid #e2e8f0',display:'flex',alignItems:'center',gap:16,WebkitTapHighlightColor:'transparent'}}
+              onTouchStart={e=>{e.currentTarget.style.background='#eff6ff';e.currentTarget.style.borderColor='#2563eb';}}
+              onTouchEnd={e=>{e.currentTarget.style.background='#f8fafc';e.currentTarget.style.borderColor='#e2e8f0';}}
+            >
+              <div style={{width:52,height:52,borderRadius:14,flexShrink:0,background:`linear-gradient(135deg,${jt.color},${jt.color}bb)`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,boxShadow:`0 4px 12px ${jt.color}44`}}>{jt.icon}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:17,fontWeight:700,color:'#1a3a6b',marginBottom:2}}>{jt.label}</div>
+                <div style={{fontSize:13,color:'#64748b'}}>{jt.desc}</div>
+              </div>
+              <div style={{color:'#94a3b8',fontSize:22,fontWeight:300}}>›</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ComingSoon ────────────────────────────────────────────────────────────────
+function ComingSoon({ jobType, onBack }) {
+  const jt = JOB_TYPES.find(j => j.id === jobType) || {};
+  return (
+    <div id="app-inner">
+      <div className="brand">
+        <div className="brand-icon">💧</div>
+        <div>
+          <div className="brand-sub">W.L. Toomey Irrigation</div>
+          <div className="brand-title">{jt.label}</div>
+        </div>
+      </div>
+      <div className="card">
+        <div className="card-header" style={{textAlign:'center',padding:'44px 22px 40px'}}>
+          <div style={{fontSize:56,marginBottom:12}}>{jt.icon}</div>
+          <div style={{fontSize:22,fontWeight:700,color:'white',marginBottom:6}}>{jt.label}</div>
+          <div style={{fontSize:14,color:'rgba(255,255,255,0.7)'}}>Coming in the next update</div>
+        </div>
+        <div className="card-body">
+          <div className="banner-blue">
+            <strong>This feature is being built now.</strong> Photo capture, markup tools, materials &amp; labor tracking, and proposal generation will all be available here soon.
+          </div>
+        </div>
+      </div>
+      <div className="nav-bar">
+        <button className="nav-btn-primary" onClick={onBack}>← Back to Home</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main App ─────────────────────────────────────────────────────────────────
 
 function App() {
@@ -550,6 +653,7 @@ function App() {
   const [step, setStep]       = useState(0);
   const [done, setDone]       = useState(false);
   const [loading, setLoading] = useState(false);
+  const [jobType, setJobType] = useState(null);
 
   // Customer
   const [name,    setName]    = useState(draft.name    || "");
@@ -628,7 +732,7 @@ function App() {
 
   function reset() {
     clearDraft();
-    setStep(0); setDone(false);
+    setStep(0); setDone(false); setJobType(null);
     setName(""); setAddress(""); setEmail("");
     setPgp(0); setMp(0); setPro4(0);
     setDrip(0); setZones(0); setValves(0);
@@ -690,6 +794,21 @@ function App() {
     
     setLoading(false);
     setDone(true);
+
+    // Save to Firebase
+    if (window.TFB) {
+      window.TFB.save({
+        jobType: 'new_installation',
+        status: 'pending',
+        customer: { name, address, email },
+        system: { pgp, mp, pro4, drip, zones, valves, timer },
+        addOns: { sidewalk, other },
+        notes,
+        price: displayPrice,
+        preparedBy: currentUser?.name || '',
+        preparedByEmail: currentUser?.email || '',
+      });
+    }
   }
   
   async function sendToClient() {
@@ -915,6 +1034,22 @@ function App() {
     );
   }
 
+  // ── Home screen ─────────────────────────────────────────────────────────────
+  if (!jobType) {
+    return (
+      <HomeScreen
+        currentUser={currentUser}
+        onSelect={setJobType}
+        onSwitchUser={() => { clearUser(); setCurrentUser(null); }}
+      />
+    );
+  }
+
+  // ── Coming soon (Re-Vamp, Service Call, System Recommendations) ──────────────
+  if (jobType !== 'new_installation') {
+    return <ComingSoon jobType={jobType} onBack={() => setJobType(null)} />;
+  }
+
   // ── Main form ──────────────────────────────────────────────────────────────
   return (
     <div id="app-inner">
@@ -1079,9 +1214,10 @@ function App() {
 
       {/* ── Sticky bottom nav ───────────────────────────────────────────────── */}
       <div className="nav-bar">
-        {step > 0 && (
-          <button className="nav-btn-back" onClick={() => setStep(s => s - 1)}>← Back</button>
-        )}
+        {step > 0
+          ? <button className="nav-btn-back" onClick={() => setStep(s => s - 1)}>← Back</button>
+          : <button className="nav-btn-back" onClick={() => setJobType(null)}>⌂ Home</button>
+        }
         {step < 3
           ? <button className="nav-btn-primary" disabled={!canNext[step]} onClick={() => { if (canNext[step]) setStep(s => s + 1); }}>
               Continue →
