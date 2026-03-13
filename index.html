@@ -293,16 +293,27 @@
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import{getFirestore,collection,addDoc}from'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import{getStorage,ref as stRef,uploadString,getDownloadURL}from'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 const cfg={apiKey:"AIzaSyCQDkIKg33wi8LZlJmTiGXEUBw_xlbWYBI",authDomain:"toomey-estimator.firebaseapp.com",projectId:"toomey-estimator",storageBucket:"toomey-estimator.firebasestorage.app",messagingSenderId:"1062716214564",appId:"1:1062716214564:web:af169caa9c952ea65ab7b1"};
 const app=initializeApp(cfg);
 const db=getFirestore(app);
+const storage=getStorage(app);
 window.TFB={
   async save(data){
     try{
-      const ref=await addDoc(collection(db,'estimates'),{...data,createdAt:new Date().toISOString()});
-      console.log('Saved to Firebase:',ref.id);
-      return ref.id;
+      const r=await addDoc(collection(db,'estimates'),{...data,createdAt:new Date().toISOString()});
+      console.log('Saved:',r.id);return r.id;
     }catch(e){console.error('Firebase save failed:',e);return null;}
+  },
+  async uploadPhoto(dataUrl,path){
+    try{
+      const r=stRef(storage,path);
+      await uploadString(r,dataUrl,'data_url');
+      return await getDownloadURL(r);
+    }catch(e){
+      console.warn('Storage upload failed, using base64 fallback:',e);
+      return dataUrl;
+    }
   }
 };
 </script>
@@ -440,6 +451,45 @@ function parseAndMergeCSV(csvText, existing) {
     }
   }
   return { list: result, added, updated, unchanged };
+}
+
+// ── Product catalog ───────────────────────────────────────────────────────────
+const SAMPLE_PRODUCTS = [
+  { id:'p1',  category:'Spray Heads',     name:'Hunter PGP-Ultra Rotary Head',  unit:'each', price: 18.00 },
+  { id:'p2',  category:'Spray Heads',     name:'Hunter Pro-4 Spray Head',       unit:'each', price: 12.00 },
+  { id:'p3',  category:'Spray Heads',     name:'MP Rotator Nozzle',             unit:'each', price:  8.50 },
+  { id:'p4',  category:'Valves',          name:'Irritrol 2400T Valve 1"',       unit:'each', price: 32.00 },
+  { id:'p5',  category:'Valves',          name:'Irritrol 2400T Valve 3/4"',     unit:'each', price: 28.00 },
+  { id:'p6',  category:'Controllers',     name:'Hunter Pro-C Controller',       unit:'each', price:185.00 },
+  { id:'p7',  category:'Controllers',     name:'Hunter HC WiFi 12-Station',     unit:'each', price:220.00 },
+  { id:'p8',  category:'Pipe & Fittings', name:'1" PVC Pipe (10ft)',            unit:'each', price:  6.50 },
+  { id:'p9',  category:'Pipe & Fittings', name:'3/4" PVC Pipe (10ft)',          unit:'each', price:  4.50 },
+  { id:'p10', category:'Pipe & Fittings', name:'1" Swing Joint',               unit:'each', price:  3.25 },
+  { id:'p11', category:'Backflow',        name:'Backflow Preventer 1"',         unit:'each', price:145.00 },
+  { id:'p12', category:'Drip',            name:'Drip Zone Kit',                 unit:'kit',  price: 85.00 },
+  { id:'p13', category:'Drip',            name:'1/2" Drip Tubing (100ft)',      unit:'roll', price: 22.00 },
+  { id:'p14', category:'Sensors',         name:'Hunter Rain Sensor',            unit:'each', price: 48.00 },
+  { id:'p15', category:'Sensors',         name:'Hunter Freeze Sensor',          unit:'each', price: 52.00 },
+];
+
+async function compressPhoto(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1200;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.floor(img.width  * scale);
+        canvas.height = Math.floor(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 // ── Sub-components ───────────────────────────────────────────────────────────
@@ -808,6 +858,506 @@ function JobPlaceholder({ jobType, customer, onBack }) {
       </div>
       <div className="nav-bar">
         <button className="nav-btn-back" onClick={onBack}>← Customers</button>
+      </div>
+    </div>
+  );
+}
+
+// ── PhotoMarkupModal ──────────────────────────────────────────────────────────
+function PhotoMarkupModal({ photo, onSave, onCancel }) {
+  const canvasRef  = useRef(null);
+  const historyRef = useRef([]);
+  const drawingRef = useRef(false);
+  const startPtRef = useRef(null);
+  const [tool, setTool]           = useState('circle');
+  const [color, setColor]         = useState('#ef4444');
+  const [canUndo, setCanUndo]     = useState(false);
+  const [textMode, setTextMode]   = useState(false);
+  const [pendingText, setPendingText] = useState('');
+  const [pendingPos, setPendingPos]   = useState(null);
+
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = canvasRef.current; if (!canvas) return;
+      const maxW = Math.min(window.innerWidth - 16, 1000);
+      const maxH = window.innerHeight - 200;
+      const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+      canvas.width  = Math.floor(img.width  * scale);
+      canvas.height = Math.floor(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      historyRef.current = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
+    };
+    img.src = photo;
+  }, [photo]);
+
+  function getPos(e) {
+    const canvas = canvasRef.current;
+    const rect   = canvas.getBoundingClientRect();
+    const src    = e.touches ? e.touches[0] : e;
+    return {
+      x: (src.clientX - rect.left) * (canvas.width  / rect.width),
+      y: (src.clientY - rect.top)  * (canvas.height / rect.height),
+    };
+  }
+
+  function drawArrow(ctx, x1, y1, x2, y2) {
+    const len = 14, angle = Math.atan2(y2 - y1, x2 - x1);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - len * Math.cos(angle - Math.PI/6), y2 - len * Math.sin(angle - Math.PI/6));
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - len * Math.cos(angle + Math.PI/6), y2 - len * Math.sin(angle + Math.PI/6));
+    ctx.stroke();
+  }
+
+  function onDown(e) {
+    e.preventDefault();
+    if (tool === 'text') { setPendingPos(getPos(e)); setPendingText(''); setTextMode(true); return; }
+    drawingRef.current = true; startPtRef.current = getPos(e);
+  }
+  function onMove(e) {
+    e.preventDefault();
+    if (!drawingRef.current || !startPtRef.current) return;
+    const canvas = canvasRef.current, ctx = canvas.getContext('2d'), pos = getPos(e);
+    ctx.putImageData(historyRef.current[historyRef.current.length - 1], 0, 0);
+    ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    if (tool === 'circle') {
+      const cx = (startPtRef.current.x + pos.x) / 2, cy = (startPtRef.current.y + pos.y) / 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, Math.max(Math.abs(pos.x-startPtRef.current.x)/2,4), Math.max(Math.abs(pos.y-startPtRef.current.y)/2,4), 0, 0, Math.PI*2);
+      ctx.stroke();
+    } else if (tool === 'arrow') { drawArrow(ctx, startPtRef.current.x, startPtRef.current.y, pos.x, pos.y); }
+  }
+  function onUp(e) {
+    e.preventDefault();
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    const canvas = canvasRef.current, ctx = canvas.getContext('2d');
+    historyRef.current = [...historyRef.current, ctx.getImageData(0, 0, canvas.width, canvas.height)];
+    setCanUndo(true);
+  }
+  function placeText() {
+    if (!pendingText.trim() || !pendingPos) { setTextMode(false); return; }
+    const canvas = canvasRef.current, ctx = canvas.getContext('2d');
+    const sz = Math.max(16, Math.floor(canvas.width / 22));
+    ctx.font = `bold ${sz}px Arial`; ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.65)'; ctx.strokeText(pendingText, pendingPos.x, pendingPos.y);
+    ctx.fillStyle = color;               ctx.fillText(pendingText, pendingPos.x, pendingPos.y);
+    historyRef.current = [...historyRef.current, ctx.getImageData(0, 0, canvas.width, canvas.height)];
+    setCanUndo(true); setTextMode(false); setPendingText('');
+  }
+  function undo() {
+    if (historyRef.current.length <= 1) return;
+    historyRef.current = historyRef.current.slice(0, -1);
+    const canvas = canvasRef.current, ctx = canvas.getContext('2d');
+    ctx.putImageData(historyRef.current[historyRef.current.length - 1], 0, 0);
+    setCanUndo(historyRef.current.length > 1);
+  }
+
+  const COLORS = ['#ef4444','#3b82f6','#eab308','#22c55e','#ffffff'];
+  return (
+    <div style={{position:'fixed',inset:0,background:'#0a0a0a',zIndex:9000,display:'flex',flexDirection:'column'}}>
+      <div style={{background:'linear-gradient(135deg,#1a3a6b,#2563eb)',padding:'10px 12px',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',flexShrink:0}}>
+        <span style={{color:'white',fontSize:13,fontWeight:700,marginRight:2}}>Markup</span>
+        {[['circle','○'],['arrow','→'],['text','T']].map(([t,icon])=>(
+          <button key={t} onClick={()=>setTool(t)} style={{padding:'6px 10px',borderRadius:8,border:`2px solid ${tool===t?'white':'rgba(255,255,255,0.3)'}`,background:tool===t?'white':'transparent',color:tool===t?'#1a3a6b':'white',fontSize:14,fontWeight:700,cursor:'pointer',minWidth:34}}>{icon}</button>
+        ))}
+        <div style={{width:1,height:22,background:'rgba(255,255,255,0.2)',margin:'0 2px'}}/>
+        {COLORS.map(c=>(
+          <div key={c} onClick={()=>setColor(c)} style={{width:24,height:24,borderRadius:'50%',background:c,cursor:'pointer',border:`3px solid ${color===c?'white':'transparent'}`,flexShrink:0}}/>
+        ))}
+        <div style={{flex:1}}/>
+        <button onClick={undo} disabled={!canUndo} style={{padding:'6px 9px',borderRadius:8,border:'1.5px solid rgba(255,255,255,0.4)',background:'transparent',color:canUndo?'white':'rgba(255,255,255,0.3)',fontSize:12,cursor:canUndo?'pointer':'default'}}>↩</button>
+        <button onClick={onCancel} style={{padding:'6px 9px',borderRadius:8,border:'1.5px solid rgba(255,255,255,0.4)',background:'transparent',color:'white',fontSize:12,cursor:'pointer'}}>✕</button>
+        <button onClick={()=>onSave(canvasRef.current.toDataURL('image/jpeg',0.82))} style={{padding:'6px 14px',borderRadius:8,border:'none',background:'#22c55e',color:'white',fontSize:12,fontWeight:700,cursor:'pointer'}}>✓ Save</button>
+      </div>
+      <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',overflow:'auto',position:'relative',padding:8}}>
+        <canvas ref={canvasRef} style={{display:'block',touchAction:'none',cursor:tool==='text'?'text':'crosshair',maxWidth:'100%'}}
+          onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp}
+          onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
+        />
+        {textMode && (
+          <div style={{position:'absolute',bottom:0,left:0,right:0,background:'white',padding:'12px 14px',display:'flex',gap:8,boxShadow:'0 -4px 20px rgba(0,0,0,0.35)'}}>
+            <input autoFocus type="text" value={pendingText} onChange={e=>setPendingText(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter')placeText();if(e.key==='Escape'){setTextMode(false);setPendingText('');}}}
+              placeholder="Type label then tap Place…"
+              style={{flex:1,padding:'10px 14px',borderRadius:10,border:'1.5px solid #e2e8f0',fontSize:16,fontFamily:'inherit'}}
+            />
+            <button onClick={placeText} style={{padding:'10px 16px',borderRadius:10,border:'none',background:'#1a3a6b',color:'white',fontWeight:700,cursor:'pointer'}}>Place</button>
+            <button onClick={()=>{setTextMode(false);setPendingText('');}} style={{padding:'10px 12px',borderRadius:10,border:'1.5px solid #e2e8f0',background:'white',color:'#64748b',cursor:'pointer'}}>✕</button>
+          </div>
+        )}
+      </div>
+      <div style={{background:'#111',padding:'7px',textAlign:'center',flexShrink:0}}>
+        <span style={{color:'rgba(255,255,255,0.45)',fontSize:11}}>{tool==='circle'?'Drag to draw a circle':tool==='arrow'?'Drag to draw an arrow':'Tap the photo where you want to place the label'}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── JobFlow ───────────────────────────────────────────────────────────────────
+function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
+  const jt = JOB_TYPES.find(j => j.id === jobType) || {};
+  const STEPS = ['Photos', 'Materials', 'Review'];
+  const [step, setStep]     = useState(0);
+  const [done, setDone]     = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Photos
+  const [photos, setPhotos]         = useState([]);
+  const [markupIdx, setMarkupIdx]   = useState(null);
+  const photoInputRef = useRef(null);
+
+  // Materials
+  const [matSearch, setMatSearch]       = useState('');
+  const [selectedItems, setSelectedItems] = useState([]);
+
+  // Labor
+  const [laborHours, setLaborHours] = useState(0);
+  const [laborRate,  setLaborRate]  = useState(110);
+
+  // Notes
+  const [notes, setNotes] = useState('');
+
+  // Totals
+  const matTotal   = selectedItems.reduce((s, i) => s + i.product.price * i.qty, 0);
+  const laborTotal = laborHours * laborRate;
+  const grandTotal = matTotal + laborTotal;
+
+  const fmt = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // ── Photos ──────────────────────────────────────────────────────────────────
+  async function handleCapture(e) {
+    const files = Array.from(e.target.files);
+    for (const f of files) {
+      if (photos.length >= 5) break;
+      const compressed = await compressPhoto(f);
+      setPhotos(prev => [...prev, { id: Date.now() + Math.random(), dataUrl: compressed, caption: '' }]);
+    }
+    e.target.value = '';
+  }
+  function saveMarkup(annotated) {
+    setPhotos(prev => prev.map((p, i) => i === markupIdx ? { ...p, dataUrl: annotated } : p));
+    setMarkupIdx(null);
+  }
+
+  // ── Materials ───────────────────────────────────────────────────────────────
+  const filteredProducts = matSearch.trim()
+    ? SAMPLE_PRODUCTS.filter(p => p.name.toLowerCase().includes(matSearch.toLowerCase()) || p.category.toLowerCase().includes(matSearch.toLowerCase()))
+    : SAMPLE_PRODUCTS;
+
+  function addProduct(product) {
+    setSelectedItems(prev => {
+      const ex = prev.find(i => i.product.id === product.id);
+      return ex ? prev.map(i => i.product.id === product.id ? { ...i, qty: i.qty + 1 } : i)
+                : [...prev, { product, qty: 1 }];
+    });
+  }
+  function updateQty(id, qty) {
+    if (qty <= 0) setSelectedItems(prev => prev.filter(i => i.product.id !== id));
+    else setSelectedItems(prev => prev.map(i => i.product.id === id ? { ...i, qty } : i));
+  }
+
+  // ── Submit ──────────────────────────────────────────────────────────────────
+  async function submit() {
+    setSaving(true);
+    try {
+      if (window.TFB) {
+        const jobId = `job_${Date.now()}`;
+        const photoData = await Promise.all(photos.map(async (p, i) => {
+          const url = await window.TFB.uploadPhoto(p.dataUrl, `jobs/${jobId}_photo${i}.jpg`);
+          return { url, caption: p.caption };
+        }));
+        await window.TFB.save({
+          jobType, status: 'pending',
+          customer: { name: customer.name, address: customer.address, email: customer.email||'', phone: customer.phone||'' },
+          photos: photoData,
+          materials: selectedItems.map(i => ({ name: i.product.name, qty: i.qty, unit: i.product.unit, unitPrice: i.product.price, total: i.product.price * i.qty })),
+          labor: { hours: laborHours, rate: laborRate, total: laborTotal },
+          notes,
+          totals: { materials: matTotal, labor: laborTotal, grand: grandTotal },
+          preparedBy: currentUser?.name || '',
+          preparedByEmail: currentUser?.email || '',
+        });
+      }
+    } catch(e) { console.error('Submit error:', e); }
+    setSaving(false);
+    setDone(true);
+  }
+
+  // ── Markup modal ─────────────────────────────────────────────────────────────
+  if (markupIdx !== null) {
+    return <PhotoMarkupModal photo={photos[markupIdx].dataUrl} onSave={saveMarkup} onCancel={() => setMarkupIdx(null)} />;
+  }
+
+  // ── Done screen ──────────────────────────────────────────────────────────────
+  if (done) {
+    return (
+      <div id="app-inner">
+        <div className="brand">
+          <div className="brand-icon">💧</div>
+          <div><div className="brand-sub">W.L. Toomey Irrigation</div><div className="brand-title">{jt.label}</div></div>
+        </div>
+        <div className="card">
+          <div className="done-header">
+            <div className="done-emoji">✅</div>
+            <div className="done-title">Job Submitted!</div>
+            <div className="done-sub">{customer.name} · {today()}</div>
+          </div>
+          <div className="card-body">
+            <div className="customer-banner">
+              <div className="customer-name">{customer.name}</div>
+              {customer.address && <div className="customer-address">{customer.address}</div>}
+              <div className="customer-date">Submitted by {currentUser?.name} · {today()}</div>
+            </div>
+            <InnerCard title="💰 Summary">
+              <Row label="Materials" value={`$${fmt(matTotal)}`} />
+              <Row label="Labor" value={`$${fmt(laborTotal)}`} />
+            </InnerCard>
+            <div className="price-callout">
+              <div>
+                <div className="price-label">Grand Total</div>
+                <div className="price-val">${fmt(grandTotal)}</div>
+                <div className="price-note">Materials + Labor</div>
+              </div>
+              <span style={{fontSize:44}}>{jt.icon}</span>
+            </div>
+            <div className="banner-blue">Saved to Firebase. PDF &amp; email coming in Phase 5.</div>
+          </div>
+        </div>
+        <div className="nav-bar">
+          <button className="nav-btn-back" onClick={onBack}>+ Same Customer</button>
+          <button className="nav-btn-primary" onClick={onHome}>⌂ Home</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main flow ────────────────────────────────────────────────────────────────
+  return (
+    <div id="app-inner">
+      <div className="brand">
+        <div className="brand-icon">💧</div>
+        <div style={{flex:1}}><div className="brand-sub">W.L. Toomey Irrigation</div><div className="brand-title">{jt.label}</div></div>
+        <div style={{width:38,height:38,borderRadius:10,background:`linear-gradient(135deg,${jt.color},${jt.color}bb)`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>{jt.icon}</div>
+      </div>
+      <div className="card">
+        <div className="card-header">
+          {/* Customer strip */}
+          <div style={{background:'rgba(255,255,255,0.12)',borderRadius:10,padding:'8px 12px',marginBottom:14,display:'flex',alignItems:'center',gap:10}}>
+            <div style={{width:32,height:32,borderRadius:8,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:700,fontSize:15,flexShrink:0}}>{customer.name.charAt(0)}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{color:'white',fontWeight:700,fontSize:14,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{customer.name}</div>
+              <div style={{color:'rgba(255,255,255,0.6)',fontSize:12,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{customer.address}</div>
+            </div>
+          </div>
+          {/* Step bar */}
+          <div className="step-bar">
+            {STEPS.map((label, i) => (
+              <div key={i} className="step-bar-item">
+                <div className="step-bar-track">
+                  {i > 0 && <div className="step-line" style={{background: i <= step ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)'}}/>}
+                  <div className={'step-circle ' + (i < step ? 'done' : i === step ? 'active' : 'future')}>{i < step ? '✓' : i + 1}</div>
+                  {i < STEPS.length-1 && <div className="step-line" style={{background: i < step ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)'}}/>}
+                </div>
+                <span className={'step-label ' + (i === step ? 'active' : 'other')}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card-body">
+
+          {/* ── Step 0: Photos ─────────────────────────────────────────────── */}
+          {step === 0 && <>
+            <div>
+              <div className="section-title">Job Photos</div>
+              <div className="section-sub">Tap a photo to mark it up with circles, arrows, and labels.</div>
+            </div>
+            {photos.length > 0 && (
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                {photos.map((p, idx) => (
+                  <div key={p.id} style={{borderRadius:12,overflow:'hidden',border:'2px solid #e2e8f0',background:'#f8fafc'}}>
+                    <div style={{position:'relative'}}>
+                      <img src={p.dataUrl} style={{width:'100%',height:110,objectFit:'cover',display:'block'}} alt="" />
+                      <button onClick={()=>setMarkupIdx(idx)} style={{position:'absolute',top:5,left:5,padding:'3px 7px',borderRadius:6,border:'none',background:'rgba(0,0,0,0.6)',color:'white',fontSize:11,fontWeight:700,cursor:'pointer'}}>✏️ Markup</button>
+                      <button onClick={()=>setPhotos(prev=>prev.filter((_,i)=>i!==idx))} style={{position:'absolute',top:5,right:5,width:24,height:24,borderRadius:6,border:'none',background:'rgba(220,38,38,0.85)',color:'white',fontSize:14,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+                    </div>
+                    <input type="text" value={p.caption} onChange={e=>setPhotos(prev=>prev.map((ph,i)=>i===idx?{...ph,caption:e.target.value}:ph))}
+                      placeholder="Add caption…"
+                      style={{width:'100%',padding:'7px 10px',border:'none',borderTop:'1px solid #e2e8f0',fontSize:13,fontFamily:'inherit',background:'white'}}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+            {photos.length < 5 && (
+              <div onClick={()=>photoInputRef.current?.click()}
+                style={{border:'2.5px dashed #cbd5e1',borderRadius:14,padding:'26px 20px',textAlign:'center',cursor:'pointer',background:'#f8fafc'}}
+                onTouchStart={e=>e.currentTarget.style.borderColor='#2563eb'}
+                onTouchEnd={e=>e.currentTarget.style.borderColor='#cbd5e1'}
+              >
+                <div style={{fontSize:34,marginBottom:6}}>📷</div>
+                <div style={{fontSize:15,fontWeight:700,color:'#1a3a6b',marginBottom:3}}>Add Photo</div>
+                <div style={{fontSize:13,color:'#94a3b8'}}>{photos.length}/5 · opens camera</div>
+              </div>
+            )}
+            <input ref={photoInputRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={handleCapture} />
+            {photos.length === 0 && <p className="hint">Photos optional — tap Continue to skip</p>}
+          </>}
+
+          {/* ── Step 1: Materials & Labor ──────────────────────────────────── */}
+          {step === 1 && <>
+            <div>
+              <div className="section-title">Materials & Labor</div>
+              <div className="section-sub">Search and add parts, then enter hours worked.</div>
+            </div>
+
+            {selectedItems.length > 0 && (
+              <InnerCard title={`🛒 Selected (${selectedItems.length})`}>
+                {selectedItems.map(item => (
+                  <div key={item.product.id} style={{display:'flex',alignItems:'center',gap:8,paddingBottom:10,borderBottom:'1px solid #f1f5f9',marginBottom:10}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:600,color:'#1a3a6b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.product.name}</div>
+                      <div style={{fontSize:12,color:'#64748b'}}>${item.product.price.toFixed(2)} / {item.product.unit}</div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:5,flexShrink:0}}>
+                      <button onClick={()=>updateQty(item.product.id,item.qty-1)} style={{width:28,height:28,borderRadius:8,border:'1.5px solid #e2e8f0',background:'#f8fafc',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700}}>−</button>
+                      <span style={{fontSize:15,fontWeight:700,color:'#1a3a6b',minWidth:22,textAlign:'center'}}>{item.qty}</span>
+                      <button onClick={()=>updateQty(item.product.id,item.qty+1)} style={{width:28,height:28,borderRadius:8,border:'1.5px solid #e2e8f0',background:'#f8fafc',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',color:'#2563eb',fontWeight:700}}>+</button>
+                      <span style={{fontSize:13,fontWeight:700,color:'#1a3a6b',minWidth:54,textAlign:'right'}}>${(item.product.price*item.qty).toFixed(2)}</span>
+                    </div>
+                  </div>
+                ))}
+                <div style={{display:'flex',justifyContent:'space-between',paddingTop:4}}>
+                  <span style={{fontSize:14,fontWeight:700,color:'#64748b'}}>Subtotal</span>
+                  <span style={{fontSize:15,fontWeight:800,color:'#1a3a6b'}}>${fmt(matTotal)}</span>
+                </div>
+              </InnerCard>
+            )}
+
+            <InnerCard title="🔍 Add Parts">
+              <input type="text" value={matSearch} onChange={e=>setMatSearch(e.target.value)} placeholder="Search parts by name or category…"
+                style={{width:'100%',padding:'11px 14px',borderRadius:10,border:'1.5px solid #e2e8f0',fontSize:16,fontFamily:'inherit',marginBottom:10}}
+              />
+              <div style={{maxHeight:230,overflowY:'auto'}}>
+                {filteredProducts.map(p => {
+                  const inCart = selectedItems.find(i => i.product.id === p.id);
+                  return (
+                    <div key={p.id} onClick={()=>addProduct(p)}
+                      style={{padding:'10px 12px',borderRadius:10,marginBottom:4,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',background:inCart?'#eff6ff':'#f8fafc',border:`1.5px solid ${inCart?'#2563eb':'#e2e8f0'}`,WebkitTapHighlightColor:'transparent'}}
+                    >
+                      <div style={{minWidth:0}}>
+                        <div style={{fontSize:14,fontWeight:600,color:'#1a3a6b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
+                        <div style={{fontSize:12,color:'#64748b'}}>{p.category} · ${p.price.toFixed(2)}/{p.unit}</div>
+                      </div>
+                      <div style={{width:28,height:28,borderRadius:8,background:inCart?'#2563eb':'#e2e8f0',display:'flex',alignItems:'center',justifyContent:'center',color:inCart?'white':'#64748b',fontWeight:700,fontSize:15,flexShrink:0,marginLeft:8}}>
+                        {inCart ? inCart.qty : '+'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </InnerCard>
+
+            <InnerCard title="👷 Labor">
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <div>
+                  <label className="field-label">Hours</label>
+                  <input type="number" min="0" step="0.5" value={laborHours || ''} onChange={e=>setLaborHours(parseFloat(e.target.value)||0)}
+                    placeholder="0" style={{width:'100%',padding:'12px 14px',borderRadius:12,border:'1.5px solid #e2e8f0',fontSize:20,fontFamily:'inherit',textAlign:'center',fontWeight:700}}
+                  />
+                </div>
+                <div>
+                  <label className="field-label">Rate ($/hr)</label>
+                  <input type="number" min="0" value={laborRate} onChange={e=>setLaborRate(parseFloat(e.target.value)||0)}
+                    style={{width:'100%',padding:'12px 14px',borderRadius:12,border:'1.5px solid #e2e8f0',fontSize:20,fontFamily:'inherit',textAlign:'center',fontWeight:700}}
+                  />
+                </div>
+              </div>
+              {laborHours > 0 && (
+                <div className="total-pill" style={{marginTop:10}}>
+                  <span className="total-pill-label">Labor Total</span>
+                  <span style={{fontSize:22,fontWeight:700}}>${fmt(laborTotal)}</span>
+                </div>
+              )}
+            </InnerCard>
+          </>}
+
+          {/* ── Step 2: Review ─────────────────────────────────────────────── */}
+          {step === 2 && <>
+            <div>
+              <div className="section-title">Review & Submit</div>
+              <div className="section-sub">Confirm everything looks right.</div>
+            </div>
+            <InnerCard title="👤 Customer">
+              <Row label="Name"        value={customer.name} accent />
+              <Row label="Address"     value={customer.address} />
+              {customer.email && <Row label="Email"   value={customer.email} />}
+              {customer.phone && <Row label="Phone"   value={customer.phone} />}
+              <Row label="Date"        value={today()} />
+              <Row label="Prepared by" value={currentUser?.name} />
+            </InnerCard>
+
+            {photos.length > 0 && (
+              <InnerCard title={`📸 Photos (${photos.length})`}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>
+                  {photos.map(p => (
+                    <div key={p.id} style={{borderRadius:8,overflow:'hidden',border:'1px solid #e2e8f0'}}>
+                      <img src={p.dataUrl} style={{width:'100%',height:66,objectFit:'cover',display:'block'}} alt="" />
+                      {p.caption && <div style={{fontSize:10,color:'#64748b',padding:'3px 4px',background:'#f8fafc',textAlign:'center',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.caption}</div>}
+                    </div>
+                  ))}
+                </div>
+              </InnerCard>
+            )}
+
+            {selectedItems.length > 0 && (
+              <InnerCard title="🔩 Materials">
+                {selectedItems.map(item => (
+                  <Row key={item.product.id} label={`${item.product.name} × ${item.qty}`} value={`$${fmt(item.product.price*item.qty)}`} />
+                ))}
+              </InnerCard>
+            )}
+
+            {laborHours > 0 && (
+              <InnerCard title="👷 Labor">
+                <Row label={`${laborHours} hr${laborHours!==1?'s':''} @ $${laborRate}/hr`} value={`$${fmt(laborTotal)}`} />
+              </InnerCard>
+            )}
+
+            <InnerCard title="📝 Notes">
+              <textarea value={notes} onChange={e=>setNotes(e.target.value)}
+                placeholder="Additional notes for the office or client…" rows={3}
+                style={{width:'100%',padding:'12px 14px',borderRadius:12,border:'1.5px solid #e2e8f0',fontSize:15,fontFamily:'inherit',resize:'vertical'}}
+              />
+            </InnerCard>
+
+            <div className="price-callout">
+              <div>
+                <div className="price-label">Grand Total</div>
+                <div className="price-val">${fmt(grandTotal)}</div>
+                <div className="price-note">Materials + Labor</div>
+              </div>
+              <span style={{fontSize:44}}>{jt.icon}</span>
+            </div>
+          </>}
+
+        </div>
+      </div>
+
+      <div className="nav-bar">
+        {step > 0
+          ? <button className="nav-btn-back" onClick={()=>setStep(s=>s-1)}>← Back</button>
+          : <button className="nav-btn-back" onClick={onBack}>← Customers</button>
+        }
+        {step < STEPS.length - 1
+          ? <button className="nav-btn-primary" onClick={()=>setStep(s=>s+1)}>Continue →</button>
+          : <button className="nav-btn-primary" disabled={saving} onClick={submit}>{saving?'⏳ Saving…':'✓ Submit Job'}</button>
+        }
       </div>
     </div>
   );
@@ -1308,6 +1858,17 @@ function App() {
           jobType={jobType}
           onSelect={c => setSelectedCustomer(c)}
           onBack={() => setJobType(null)}
+        />
+      );
+    }
+    if (jobType === 'revamp' || jobType === 'service_call') {
+      return (
+        <JobFlow
+          jobType={jobType}
+          customer={selectedCustomer}
+          onBack={() => setSelectedCustomer(null)}
+          onHome={() => { setJobType(null); setSelectedCustomer(null); }}
+          currentUser={currentUser}
         />
       );
     }
