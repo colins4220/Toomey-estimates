@@ -278,6 +278,10 @@
       padding: 2px 6px; border-radius: 4px; font-size: 12px;
     }
 
+    /* Customer search */
+    .customer-search::placeholder { color: rgba(255,255,255,0.5); }
+    .customer-search:focus { outline: none; box-shadow: none; border-color: rgba(255,255,255,0.6); }
+
     /* Hidden utility */
     .hidden { display: none !important; }
   </style>
@@ -352,6 +356,90 @@ function saveDraft(data) {
 }
 function clearDraft() {
   try { localStorage.removeItem(STORAGE_KEY); } catch {}
+}
+
+// ── Customer storage ──────────────────────────────────────────────────────────
+const CUSTOMERS_KEY = 'toomey_customers';
+
+const SAMPLE_CUSTOMERS = [
+  { id:'c1', name:'Robert & Susan Johnson',  address:'47 Maple Street, Lexington, MA 02420',    email:'rjohnson@gmail.com',       phone:'781-555-0142' },
+  { id:'c2', name:'Michael Chen',             address:'12 Oak Ridge Road, Concord, MA 01742',    email:'mchen@outlook.com',        phone:'978-555-0218' },
+  { id:'c3', name:'Patricia Walsh',           address:'88 Birchwood Drive, Needham, MA 02492',   email:'pwalsh@gmail.com',         phone:'781-555-0367' },
+  { id:'c4', name:'David & Karen Murphy',     address:'203 Highland Ave, Winchester, MA 01890',  email:'dmurphy@yahoo.com',        phone:'781-555-0491' },
+  { id:'c5', name:'Thomas Brennan',           address:'15 Elm Court, Wellesley, MA 02481',       email:'tbrennan@gmail.com',       phone:'781-555-0523' },
+  { id:'c6', name:'Linda Fitzgerald',         address:'56 Pine Street, Weston, MA 02493',        email:'lfitzgerald@comcast.net',  phone:'781-555-0634' },
+  { id:'c7', name:"James & Mary O'Brien",     address:'91 Cedar Lane, Medfield, MA 02052',       email:'jobrien@gmail.com',        phone:'508-555-0712' },
+  { id:'c8', name:'William Donovan',          address:'34 Willow Way, Westwood, MA 02090',       email:'wdonovan@hotmail.com',     phone:'781-555-0856' },
+];
+
+function loadCustomers() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(CUSTOMERS_KEY));
+    if (stored && stored.length > 0) return stored;
+    localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(SAMPLE_CUSTOMERS));
+    return SAMPLE_CUSTOMERS;
+  } catch { return SAMPLE_CUSTOMERS; }
+}
+
+function saveCustomers(list) {
+  try { localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(list)); } catch {}
+}
+
+function splitCSVRow(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (const ch of line) {
+    if (ch === '"') { inQ = !inQ; }
+    else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+    else { cur += ch; }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+function parseAndMergeCSV(csvText, existing) {
+  const lines = csvText.trim().split('\n').filter(l => l.trim());
+  if (lines.length < 2) return { list: existing, added: 0, updated: 0, unchanged: 0 };
+
+  const headers = splitCSVRow(lines[0]).map(h => h.toLowerCase().replace(/['"]/g,''));
+  const col = (row, ...names) => {
+    for (const n of names) {
+      const i = headers.indexOf(n);
+      if (i !== -1 && row[i]) return row[i].replace(/^["']|["']$/g,'').trim();
+    }
+    return '';
+  };
+
+  let added = 0, updated = 0, unchanged = 0;
+  const result = [...existing];
+
+  for (let i = 1; i < lines.length; i++) {
+    const row = splitCSVRow(lines[i]);
+    const incoming = {
+      name:    col(row, 'name', 'customer name', 'full name', 'customer'),
+      address: col(row, 'address', 'property address', 'street address'),
+      email:   col(row, 'email', 'email address'),
+      phone:   col(row, 'phone', 'phone number', 'telephone', 'cell', 'mobile'),
+    };
+    if (!incoming.name) continue;
+
+    const idx = result.findIndex(c =>
+      (incoming.email && c.email && c.email.toLowerCase() === incoming.email.toLowerCase()) ||
+      (c.name.toLowerCase() === incoming.name.toLowerCase() &&
+       c.address.toLowerCase() === incoming.address.toLowerCase())
+    );
+
+    if (idx === -1) {
+      result.push({ ...incoming, id: 'c' + Date.now() + i });
+      added++;
+    } else {
+      const changed = Object.keys(incoming).some(k => incoming[k] && result[idx][k] !== incoming[k]);
+      if (changed) {
+        result[idx] = { ...result[idx], ...Object.fromEntries(Object.entries(incoming).filter(([,v]) => v)) };
+        updated++;
+      } else { unchanged++; }
+    }
+  }
+  return { list: result, added, updated, unchanged };
 }
 
 // ── Sub-components ───────────────────────────────────────────────────────────
@@ -559,6 +647,172 @@ function InnerCard({ title, children }) {
   );
 }
 
+// ── CustomerSelect ────────────────────────────────────────────────────────────
+function CustomerSelect({ jobType, onSelect, onBack }) {
+  const jt = JOB_TYPES.find(j => j.id === jobType) || {};
+  const [query, setQuery]         = useState('');
+  const [customers, setCustomers] = useState(() => loadCustomers());
+  const [newMode, setNewMode]     = useState(false);
+  const [newC, setNewC]           = useState({ name:'', address:'', email:'', phone:'' });
+  const fileRef = useRef(null);
+
+  const filtered = query.trim()
+    ? customers.filter(c =>
+        c.name.toLowerCase().includes(query.toLowerCase()) ||
+        c.address.toLowerCase().includes(query.toLowerCase()) ||
+        (c.email||'').toLowerCase().includes(query.toLowerCase()) ||
+        (c.phone||'').includes(query)
+      )
+    : customers;
+
+  function handleCSV(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const r = parseAndMergeCSV(ev.target.result, customers);
+      saveCustomers(r.list);
+      setCustomers(r.list);
+      alert(`✅ Import complete!\n${r.added} added  •  ${r.updated} updated  •  ${r.unchanged} unchanged`);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  function addNewCustomer() {
+    if (!newC.name.trim() || !newC.address.trim()) { alert('Name and address are required.'); return; }
+    const c = { ...newC, id: 'c' + Date.now() };
+    const updated = [...customers, c];
+    saveCustomers(updated);
+    setCustomers(updated);
+    onSelect(c);
+  }
+
+  if (newMode) {
+    return (
+      <div id="app-inner">
+        <div className="brand">
+          <div className="brand-icon">💧</div>
+          <div style={{flex:1}}><div className="brand-sub">W.L. Toomey Irrigation</div><div className="brand-title">New Customer</div></div>
+        </div>
+        <div className="card">
+          <div className="card-header" style={{padding:'18px 22px'}}>
+            <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.7)',textTransform:'uppercase',letterSpacing:'0.1em'}}>Enter Customer Details</div>
+          </div>
+          <div className="card-body">
+            <Field label="Customer Name"   value={newC.name}    onChange={v=>setNewC(p=>({...p,name:v}))}    placeholder="John & Jane Smith"                  icon="👤" />
+            <AddressField label="Address"  value={newC.address} onChange={v=>setNewC(p=>({...p,address:v}))} placeholder="123 Main St, Lexington, MA"          icon="🏡" />
+            <Field label="Email (optional)"value={newC.email}   onChange={v=>setNewC(p=>({...p,email:v}))}   placeholder="john@example.com" type="email"      icon="✉️" />
+            <Field label="Phone (optional)"value={newC.phone}   onChange={v=>setNewC(p=>({...p,phone:v}))}   placeholder="781-555-0000"                       icon="📞" />
+          </div>
+        </div>
+        <div className="nav-bar">
+          <button className="nav-btn-back" onClick={() => setNewMode(false)}>← Back</button>
+          <button className="nav-btn-primary" disabled={!newC.name.trim()||!newC.address.trim()} onClick={addNewCustomer}>Continue →</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div id="app-inner">
+      <div className="brand">
+        <div className="brand-icon">💧</div>
+        <div style={{flex:1}}><div className="brand-sub">W.L. Toomey Irrigation</div><div className="brand-title">{jt.label}</div></div>
+        <div style={{width:38,height:38,borderRadius:10,background:`linear-gradient(135deg,${jt.color},${jt.color}bb)`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>{jt.icon}</div>
+      </div>
+      <div className="card">
+        <div className="card-header" style={{padding:'16px 20px 14px'}}>
+          <div style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.65)',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:8}}>Step 1 · Select Customer</div>
+          <input
+            className="customer-search"
+            type="text" value={query} onChange={e=>setQuery(e.target.value)}
+            placeholder="Search name, address, or email…"
+            style={{width:'100%',padding:'11px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.3)',fontSize:16,background:'rgba(255,255,255,0.12)',color:'white',fontFamily:'inherit'}}
+          />
+          <div style={{marginTop:10,display:'flex',alignItems:'center',gap:8}}>
+            <div style={{fontSize:12,color:'rgba(255,255,255,0.6)',flex:1}}>{filtered.length} customer{filtered.length!==1?'s':''}</div>
+            <button onClick={()=>fileRef.current?.click()} style={{padding:'6px 12px',borderRadius:8,border:'1.5px solid rgba(255,255,255,0.4)',background:'transparent',color:'white',fontSize:12,fontWeight:600,cursor:'pointer'}}>↑ Import CSV</button>
+          </div>
+          <input ref={fileRef} type="file" accept=".csv" style={{display:'none'}} onChange={handleCSV} />
+        </div>
+
+        <div style={{maxHeight:'52vh',overflowY:'auto'}}>
+          {filtered.length === 0 && (
+            <div style={{padding:'32px 22px',textAlign:'center',color:'#94a3b8',fontSize:14}}>
+              {query ? 'No customers match your search.' : 'No customers yet.'}
+            </div>
+          )}
+          {filtered.map((c,i) => (
+            <div key={c.id||i} onClick={()=>onSelect(c)}
+              style={{padding:'14px 20px',borderBottom:'1px solid #f1f5f9',cursor:'pointer',display:'flex',alignItems:'center',gap:14,WebkitTapHighlightColor:'transparent'}}
+              onTouchStart={e=>e.currentTarget.style.background='#eff6ff'}
+              onTouchEnd={e=>e.currentTarget.style.background=''}
+            >
+              <div style={{width:42,height:42,borderRadius:12,background:'linear-gradient(135deg,#1a3a6b,#2563eb)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:700,fontSize:17,flexShrink:0}}>
+                {c.name.charAt(0)}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:700,color:'#1a3a6b',fontSize:16,marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</div>
+                <div style={{fontSize:13,color:'#64748b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.address}</div>
+                {c.phone && <div style={{fontSize:12,color:'#94a3b8',marginTop:1}}>{c.phone}</div>}
+              </div>
+              <div style={{color:'#94a3b8',fontSize:22,flexShrink:0}}>›</div>
+            </div>
+          ))}
+          <div onClick={()=>setNewMode(true)}
+            style={{padding:'14px 20px',cursor:'pointer',display:'flex',alignItems:'center',gap:14,WebkitTapHighlightColor:'transparent'}}
+            onTouchStart={e=>e.currentTarget.style.background='#f0fdf4'}
+            onTouchEnd={e=>e.currentTarget.style.background=''}
+          >
+            <div style={{width:42,height:42,borderRadius:12,background:'#f0fdf4',border:'2px dashed #10b981',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0,color:'#10b981'}}>+</div>
+            <div>
+              <div style={{fontWeight:700,color:'#10b981',fontSize:15}}>New Customer</div>
+              <div style={{fontSize:13,color:'#94a3b8'}}>Enter details manually</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="nav-bar">
+        <button className="nav-btn-back" onClick={onBack}>← Home</button>
+      </div>
+    </div>
+  );
+}
+
+// ── JobPlaceholder (Phase 3 stub) ─────────────────────────────────────────────
+function JobPlaceholder({ jobType, customer, onBack }) {
+  const jt = JOB_TYPES.find(j => j.id === jobType) || {};
+  return (
+    <div id="app-inner">
+      <div className="brand">
+        <div className="brand-icon">💧</div>
+        <div><div className="brand-sub">W.L. Toomey Irrigation</div><div className="brand-title">{jt.label}</div></div>
+      </div>
+      <div className="card">
+        <div className="card-header" style={{textAlign:'center',padding:'28px 22px 24px'}}>
+          <div style={{fontSize:44,marginBottom:10}}>{jt.icon}</div>
+          <div style={{fontSize:20,fontWeight:700,color:'white',marginBottom:4}}>Customer Selected</div>
+          <div style={{fontSize:13,color:'rgba(255,255,255,0.7)'}}>Job details coming in Phase 3</div>
+        </div>
+        <div className="card-body">
+          <div className="customer-banner">
+            <div className="customer-name">{customer.name}</div>
+            {customer.address && <div className="customer-address">{customer.address}</div>}
+            {customer.email   && <div className="customer-email">{customer.email}</div>}
+            {customer.phone   && <div className="customer-email">{customer.phone}</div>}
+          </div>
+          <div className="banner-blue">
+            <strong>Phase 3 — Coming Next:</strong> Photo capture, markup tools, materials &amp; labor tracking, and proposal generation will all be built on top of this.
+          </div>
+        </div>
+      </div>
+      <div className="nav-bar">
+        <button className="nav-btn-back" onClick={onBack}>← Customers</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Job type config ───────────────────────────────────────────────────────────
 const JOB_TYPES = [
   { id: 'new_installation',      label: 'New Installation',      icon: '🌱', color: '#1a3a6b', desc: 'Full system design & estimate' },
@@ -653,7 +907,8 @@ function App() {
   const [step, setStep]       = useState(0);
   const [done, setDone]       = useState(false);
   const [loading, setLoading] = useState(false);
-  const [jobType, setJobType] = useState(null);
+  const [jobType, setJobType]               = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   // Customer
   const [name,    setName]    = useState(draft.name    || "");
@@ -732,7 +987,7 @@ function App() {
 
   function reset() {
     clearDraft();
-    setStep(0); setDone(false); setJobType(null);
+    setStep(0); setDone(false); setJobType(null); setSelectedCustomer(null);
     setName(""); setAddress(""); setEmail("");
     setPgp(0); setMp(0); setPro4(0);
     setDrip(0); setZones(0); setValves(0);
@@ -1045,9 +1300,24 @@ function App() {
     );
   }
 
-  // ── Coming soon (Re-Vamp, Service Call, System Recommendations) ──────────────
+  // ── New job types: customer select then job flow ──────────────────────────────
   if (jobType !== 'new_installation') {
-    return <ComingSoon jobType={jobType} onBack={() => setJobType(null)} />;
+    if (!selectedCustomer) {
+      return (
+        <CustomerSelect
+          jobType={jobType}
+          onSelect={c => setSelectedCustomer(c)}
+          onBack={() => setJobType(null)}
+        />
+      );
+    }
+    return (
+      <JobPlaceholder
+        jobType={jobType}
+        customer={selectedCustomer}
+        onBack={() => setSelectedCustomer(null)}
+      />
+    );
   }
 
   // ── Main form ──────────────────────────────────────────────────────────────
