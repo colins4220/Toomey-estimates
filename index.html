@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+
+  <!-- PWA + iOS standalone essentials -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Toomey Est." />
+  <meta name="theme-color" content="#1a3a6b" />
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- iOS home screen icons (generate real PNGs from icon.svg for production) -->
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
+  <title>W.L. Toomey – Estimate Builder</title>
+
+  <!-- Google Places API for address autocomplete -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAIMgHjjb3PGLpHq0aTlZqd55WkssUnOS8&libraries=places" async defer></script>
+
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      /* Fill the whole screen including notch/home indicator areas */
+      height: -webkit-fill-available;
+    }
+
+    body {
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      font-family: Georgia, 'Times New Roman', serif;
+      -webkit-font-smoothing: antialiased;
+      -webkit-text-size-adjust: 100%;
+      /* Prevent overscroll bounce showing white background in standalone mode */
+      overscroll-behavior: none;
+      background: #0c1e3c;
+      /* Stretch body background under the status bar */
+      padding-top: env(safe-area-inset-top);
+    }
+
+    /* Prevent double-tap zoom anywhere */
+    * { touch-action: manipulation; }
+
+    /* ── Layout ────────────────────────────────────────────────────────────── */
+    #app {
+      min-height: 100dvh;
+      background: linear-gradient(160deg, #0c1e3c 0%, #1a3a6b 55%, #0c1e3c 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      /* Top padding = status bar height in standalone mode */
+      padding: calc(env(safe-area-inset-top) + 20px) 16px
+               calc(env(safe-area-inset-bottom) + 82px) 16px;
+    }
+
+    /* ── Brand bar ─────────────────────────────────────────────────────────── */
+    .brand {
+      width: 100%; max-width: 680px;
+      display: flex; align-items: center; gap: 14px;
+      margin-bottom: 16px;
+    }
+    .brand-icon {
+      width: 50px; height: 50px; border-radius: 14px;
+      background: rgba(255,255,255,0.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; flex-shrink: 0;
+    }
+    .brand-sub { color: rgba(255,255,255,0.55); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+    .brand-title { color: white; font-size: 20px; font-weight: 700; margin-top: 2px; }
+
+    /* ── Card ──────────────────────────────────────────────────────────────── */
+    .card {
+      width: 100%; max-width: 680px;
+      background: white; border-radius: 22px;
+      box-shadow: 0 30px 70px rgba(0,0,0,0.45);
+      overflow: hidden;
+    }
+
+    /* ── Header / step bar ─────────────────────────────────────────────────── */
+    .card-header {
+      background: linear-gradient(135deg, #1a3a6b 0%, #2563eb 100%);
+      padding: 22px 22px 18px;
+    }
+    .step-bar { display: flex; align-items: flex-start; }
+    .step-bar-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+    .step-bar-track { display: flex; align-items: center; width: 100%; }
+    .step-line { flex: 1; height: 3px; transition: background 0.3s; }
+    .step-circle {
+      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 800; transition: all 0.3s;
+    }
+    .step-circle.done  { background: rgba(255,255,255,0.9); color: #1a3a6b; }
+    .step-circle.active{ background: white; color: #1a3a6b; box-shadow: 0 0 0 5px rgba(255,255,255,0.25); }
+    .step-circle.future{ background: rgba(255,255,255,0.2); color: rgba(255,255,255,0.6); }
+    .step-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.07em; text-align: center; line-height: 1.2;
+    }
+    .step-label.active { color: white; }
+    .step-label.other  { color: rgba(255,255,255,0.5); }
+
+    /* ── Card body ─────────────────────────────────────────────────────────── */
+    .card-body {
+      padding: 24px 22px 28px;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+
+    .section-title { font-size: 20px; font-weight: 700; color: #1a3a6b; margin-bottom: 3px; }
+    .section-sub   { font-size: 14px; color: #94a3b8; }
+
+    /* ── Inner section card ────────────────────────────────────────────────── */
+    .inner-card {
+      background: #f8fafc; border-radius: 18px;
+      padding: 20px; display: flex; flex-direction: column; gap: 18px;
+    }
+    .inner-card-title {
+      font-size: 12px; font-weight: 800; color: #1a3a6b;
+      letter-spacing: 0.1em; text-transform: uppercase;
+    }
+
+    /* ── Form labels ───────────────────────────────────────────────────────── */
+    .field-label {
+      display: block; font-size: 13px; font-weight: 700; color: #475569;
+      letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 8px;
+    }
+
+    /* ── Inputs — 16px minimum prevents iOS auto-zoom ─────────────────────── */
+    input, select, textarea {
+      font-family: inherit;
+      font-size: 16px; /* CRITICAL: prevents iOS zoom-on-focus */
+      color: #1e293b;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 14px;
+      background: white;
+      width: 100%;
+      padding: 14px 16px;
+      min-height: 56px;
+      outline: none;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    }
+    textarea { min-height: 100px; resize: vertical; }
+
+    .select-wrap { position: relative; }
+    .select-wrap::after {
+      content: "▾";
+      position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+      pointer-events: none; color: #64748b; font-size: 20px;
+    }
+    select { padding-right: 48px; cursor: pointer; }
+
+    /* ── Stepper ───────────────────────────────────────────────────────────── */
+    .stepper {
+      display: flex; align-items: center;
+      border: 1.5px solid #e2e8f0; border-radius: 14px;
+      overflow: hidden; background: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .stepper-btn {
+      width: 58px; height: 58px; border: none; font-size: 28px; font-weight: 700;
+      cursor: pointer; flex-shrink: 0; background: #f1f5f9;
+      -webkit-tap-highlight-color: transparent;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .stepper-btn:active { background: #e2e8f0; }
+    .stepper-btn.minus { color: #475569; }
+    .stepper-btn.minus.zero { background: #f8fafc; color: #cbd5e1; }
+    .stepper-btn.plus { color: #2563eb; }
+    .stepper-val {
+      flex: 1; text-align: center; font-size: 26px; font-weight: 700;
+      color: #1a3a6b; font-family: Georgia, serif; user-select: none;
+    }
+    .stepper-val.zero { color: #94a3b8; }
+
+    /* ── Total heads pill ──────────────────────────────────────────────────── */
+    .total-pill {
+      background: linear-gradient(135deg,#1a3a6b,#2563eb);
+      border-radius: 14px; padding: 14px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      color: white;
+    }
+    .total-pill-label { font-size: 15px; font-weight: 700; opacity: 0.9; }
+    .total-pill-val   { font-size: 36px; font-weight: 700; font-family: Georgia, serif; }
+
+    /* ── Summary rows ──────────────────────────────────────────────────────── */
+    .summary-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid #f1f5f9;
+    }
+    .summary-row:last-child { border-bottom: none; }
+    .summary-label { font-size: 15px; color: #64748b; font-weight: 500; }
+    .summary-val   { font-size: 16px; color: #1e293b; font-weight: 600; }
+    .summary-val.accent { color: #1a3a6b; font-weight: 800; }
+
+    /* ── Price callout ─────────────────────────────────────────────────────── */
+    .price-callout {
+      background: linear-gradient(135deg,#1a3a6b,#2563eb);
+      border-radius: 16px; padding: 20px 22px;
+      display: flex; justify-content: space-between; align-items: center;
+      color: white;
+    }
+    .price-label { font-size: 12px; font-weight: 700; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.08em; }
+    .price-val   { font-size: 40px; font-weight: 700; font-family: Georgia, serif; line-height: 1; }
+    .price-note  { font-size: 12px; opacity: 0.65; margin-top: 3px; }
+
+    /* ── Info banners ──────────────────────────────────────────────────────── */
+    .banner-yellow { background:#fffbeb; border:1.5px solid #fde68a; border-radius:12px; padding:12px 16px; font-size:13px; color:#92400e; line-height:1.5; }
+    .banner-blue   { background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:12px; padding:14px 16px; font-size:13px; color:#1d4ed8; line-height:1.6; }
+    .banner-date   { background:#f0f9ff; border-radius:14px; padding:14px 18px; display:flex; gap:14px; align-items:center; }
+    .banner-date-label { font-size:12px; font-weight:700; color:#0369a1; text-transform:uppercase; letter-spacing:0.06em; }
+    .banner-date-val   { font-size:17px; color:#0c4a6e; font-weight:600; margin-top:2px; }
+
+    /* ── Hint text ─────────────────────────────────────────────────────────── */
+    .hint { text-align:center; font-size:13px; color:#94a3b8; }
+
+    /* ── Sticky nav bar ────────────────────────────────────────────────────── */
+    .nav-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      background: linear-gradient(135deg, #1a3a6b 0%, #2563eb 100%);
+      /* Pad below buttons for iPad home indicator */
+      padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+      display: flex; gap: 12px;
+      box-shadow: 0 -6px 28px rgba(0,0,0,0.35);
+    }
+    .nav-btn-primary {
+      flex: 1; min-height: 54px; border-radius: 14px; border: none;
+      background: white; color: #1a3a6b;
+      font-size: 17px; font-weight: 800; font-family: inherit;
+      cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .nav-btn-primary:active { opacity: 0.85; transform: scale(0.98); }
+    .nav-btn-primary:disabled {
+      background: rgba(255,255,255,0.18); color: rgba(255,255,255,0.4);
+      box-shadow: none; cursor: default; transform: none;
+    }
+    .nav-btn-back {
+      min-height: 54px; padding: 0 22px; border-radius: 14px;
+      background: rgba(255,255,255,0.12); border: 1.5px solid rgba(255,255,255,0.3);
+      color: white; font-size: 17px; font-weight: 700; font-family: inherit;
+      cursor: pointer; flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .nav-btn-back:active { opacity: 0.8; }
+
+    /* ── Done screen customer banner ───────────────────────────────────────── */
+    .customer-banner {
+      background: linear-gradient(135deg,#1a3a6b,#2563eb);
+      border-radius: 16px; padding: 20px 22px; color: white;
+    }
+    .customer-name    { font-size: 21px; font-weight: 700; }
+    .customer-address { font-size: 15px; opacity: 0.85; margin-top: 3px; }
+    .customer-email   { font-size: 14px; opacity: 0.7; margin-top: 2px; }
+    .customer-date    { font-size: 13px; opacity: 0.65; margin-top: 10px; }
+
+    /* ── Done screen success header ────────────────────────────────────────── */
+    .done-header {
+      background: linear-gradient(135deg, #1a3a6b 0%, #2563eb 100%);
+      padding: 28px 22px 24px; color: white; text-align: center;
+    }
+    .done-emoji  { font-size: 52px; line-height: 1; }
+    .done-title  { font-size: 22px; font-weight: 700; margin-top: 8px; }
+    .done-sub    { font-size: 14px; opacity: 0.75; margin-top: 4px; }
+
+    code {
+      background: #dbeafe; color: #1d4ed8;
+      padding: 2px 6px; border-radius: 4px; font-size: 12px;
+    }
+
+    /* Hidden utility */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- React + Babel (no build step) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const TIMER_OPTIONS = [
+  "Hunter Pro-C",
+  "Hunter HC-WiFi Timer (12 Station)",
+  "Hunter HC-WiFi Timer (24 Station)",
+  "Other",
+];
+
+const TEAM_MEMBERS = [
+  { name: "Bill Toomey", email: "bill@toomeyirrigation.com", title: "Founder, Co-Owner" },
+  { name: "Jerry Toomey", email: "jerry@toomeyirrigation.com", title: "Co-Owner" },
+  { name: "Colin Smith", email: "colin@toomeyirrigation.com", title: "Team Member" },
+];
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function today() {
+  return new Date().toLocaleDateString("en-US", { year:"numeric", month:"long", day:"numeric" });
+}
+
+// User management - persist who's logged in
+const USER_KEY = "toomey_current_user";
+function loadUser() {
+  try { return JSON.parse(localStorage.getItem(USER_KEY)); } catch { return null; }
+}
+function saveUser(user) {
+  try { localStorage.setItem(USER_KEY, JSON.stringify(user)); } catch {}
+}
+function clearUser() {
+  try { localStorage.removeItem(USER_KEY); } catch {}
+}
+
+// Persist draft to localStorage so closing the app doesn't lose work
+const STORAGE_KEY = "toomey_draft";
+function loadDraft() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+}
+function saveDraft(data) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+}
+function clearDraft() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch {}
+}
+
+// ── Sub-components ───────────────────────────────────────────────────────────
+
+function StepBar({ step }) {
+  const labels = ["Customer","System","Add-Ons","Review"];
+  const lineColor = (i) => i < step ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)";
+  return (
+    <div className="step-bar">
+      {labels.map((label, i) => (
+        <div key={i} className="step-bar-item">
+          <div className="step-bar-track">
+            {i > 0 && <div className="step-line" style={{background: lineColor(i)}} />}
+            <div className={"step-circle " + (i < step ? "done" : i === step ? "active" : "future")}>
+              {i < step ? "✓" : i + 1}
+            </div>
+            {i < labels.length - 1 && <div className="step-line" style={{background: lineColor(i+1)}} />}
+          </div>
+          <span className={"step-label " + (i === step ? "active" : "other")}>{label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Stepper({ label, value, onChange, icon }) {
+  return (
+    <div>
+      <label className="field-label">{icon && <span style={{marginRight:6}}>{icon}</span>}{label}</label>
+      <div className="stepper">
+        <button
+          className={"stepper-btn minus" + (value === 0 ? " zero" : "")}
+          onClick={() => onChange(Math.max(0, value - 1))}
+          aria-label={"Decrease " + label}
+        >−</button>
+        <div className={"stepper-val" + (value === 0 ? " zero" : "")}>{value}</div>
+        <button
+          className="stepper-btn plus"
+          onClick={() => onChange(Math.min(60, value + 1))}
+          aria-label={"Increase " + label}
+        >+</button>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, placeholder, icon, type="text" }) {
+  return (
+    <div>
+      <label className="field-label">{icon && <span style={{marginRight:6}}>{icon}</span>}{label}</label>
+      <input
+        type={type} value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoCapitalize={type === "email" ? "none" : "words"}
+        autoCorrect="off" autoComplete="off"
+      />
+    </div>
+  );
+}
+
+function AddressField({ label, value, onChange, placeholder, icon }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const inputRef = React.useRef(null);
+
+  async function handleInputChange(text) {
+    onChange(text);
+    
+    if (text.length < 3) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    // Call Google Places Autocomplete API
+    try {
+      const service = new google.maps.places.AutocompleteService();
+      service.getPlacePredictions(
+        {
+          input: text,
+          types: ['address'],
+          componentRestrictions: { country: 'us' }
+        },
+        (predictions, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+            setSuggestions(predictions);
+            setShowSuggestions(true);
+          } else {
+            setSuggestions([]);
+            setShowSuggestions(false);
+          }
+        }
+      );
+    } catch (err) {
+      console.error('Places API error:', err);
+    }
+  }
+
+  function selectAddress(prediction) {
+    onChange(prediction.description);
+    setSuggestions([]);
+    setShowSuggestions(false);
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <label className="field-label">{icon && <span style={{marginRight:6}}>{icon}</span>}{label}</label>
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={e => handleInputChange(e.target.value)}
+        placeholder={placeholder}
+        autoCapitalize="words"
+        autoCorrect="off"
+        autoComplete="off"
+      />
+      {showSuggestions && suggestions.length > 0 && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          background: 'white',
+          border: '1.5px solid #e2e8f0',
+          borderTop: 'none',
+          borderRadius: '0 0 14px 14px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          maxHeight: '240px',
+          overflowY: 'auto',
+          zIndex: 1000,
+          marginTop: '-12px',
+          paddingTop: '12px'
+        }}>
+          {suggestions.map((pred, i) => (
+            <div
+              key={pred.place_id}
+              onClick={() => selectAddress(pred)}
+              style={{
+                padding: '12px 16px',
+                cursor: 'pointer',
+                fontSize: '15px',
+                color: '#1e293b',
+                borderBottom: i < suggestions.length - 1 ? '1px solid #f1f5f9' : 'none',
+                background: 'white',
+                transition: 'background 0.15s'
+              }}
+              onMouseEnter={e => e.target.style.background = '#f8fafc'}
+              onMouseLeave={e => e.target.style.background = 'white'}
+            >
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                {pred.structured_formatting.main_text}
+              </div>
+              <div style={{ fontSize: 13, color: '#64748b' }}>
+                {pred.structured_formatting.secondary_text}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AreaField({ label, value, onChange, placeholder, icon }) {
+  return (
+    <div>
+      <label className="field-label">{icon && <span style={{marginRight:6}}>{icon}</span>}{label}</label>
+      <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={4} />
+    </div>
+  );
+}
+
+function SelectField({ label, value, onChange, options, icon }) {
+  return (
+    <div>
+      <label className="field-label">{icon && <span style={{marginRight:6}}>{icon}</span>}{label}</label>
+      <div className="select-wrap">
+        <select value={value} onChange={e => onChange(e.target.value)}>
+          {options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value, accent }) {
+  if (!value && value !== 0) return null;
+  if (value === 0 || value === "0") return null;
+  return (
+    <div className="summary-row">
+      <span className="summary-label">{label}</span>
+      <span className={"summary-val" + (accent ? " accent" : "")}>{value}</span>
+    </div>
+  );
+}
+
+function InnerCard({ title, children }) {
+  return (
+    <div className="inner-card">
+      {title && <div className="inner-card-title">{title}</div>}
+      {children}
+    </div>
+  );
+}
+
+// ── Main App ─────────────────────────────────────────────────────────────────
+
+function App() {
+  const draft = loadDraft();
+  const [currentUser, setCurrentUser] = useState(loadUser());
+
+  const [step, setStep]       = useState(0);
+  const [done, setDone]       = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Customer
+  const [name,    setName]    = useState(draft.name    || "");
+  const [address, setAddress] = useState(draft.address || "");
+  const [email,   setEmail]   = useState(draft.email   || "");
+
+  // System
+  const [pgp,      setPgp]      = useState(draft.pgp      || 0);
+  const [mp,       setMp]       = useState(draft.mp       || 0);
+  const [pro4,     setPro4]     = useState(draft.pro4     || 0);
+  const [drip,     setDrip]     = useState(draft.drip     || 0);
+  const [zones,    setZones]    = useState(draft.zones    || 0);
+  const [valves,   setValves]   = useState(draft.valves   || 0);
+  const [timer,    setTimer]    = useState(draft.timer    || TIMER_OPTIONS[0]);
+
+  // Pricing
+  const [price,    setPrice]    = useState(draft.price    || "");
+  const [notes,    setNotes]    = useState(draft.notes    || "");
+  const [sidewalk, setSidewalk] = useState(draft.sidewalk || "");
+  const [other,    setOther]    = useState(draft.other    || "");
+
+  const totalHeads = pgp + mp + pro4;
+  const proposalDate = today();
+
+  // Pricing logic: auto-calculate but allow manual override
+  const [priceOverride, setPriceOverride] = useState(draft.priceOverride || "");
+  
+  function calculatePrice() {
+    let headsCost = 0;
+    if (totalHeads <= 15) {
+      headsCost = 2650;
+    } else if (totalHeads <= 30) {
+      headsCost = 3635;
+    } else {
+      headsCost = totalHeads * 125;
+    }
+    
+    const dripCost = drip * 1000;
+    return headsCost + dripCost;
+  }
+  
+  const autoPrice = calculatePrice();
+  const displayPrice = priceOverride || autoPrice.toLocaleString();
+  
+  function getPriceBreakdown() {
+    let parts = [];
+    
+    if (totalHeads > 0) {
+      if (totalHeads <= 15) {
+        parts.push(`${totalHeads} heads: $2,650 (base)`);
+      } else if (totalHeads <= 30) {
+        parts.push(`${totalHeads} heads: $3,635 (16-30 tier)`);
+      } else {
+        parts.push(`${totalHeads} heads × $125 = $${(totalHeads * 125).toLocaleString()}`);
+      }
+    }
+    
+    if (drip > 0) {
+      parts.push(`${drip} drip zone${drip > 1 ? 's' : ''} × $1,000 = $${(drip * 1000).toLocaleString()}`);
+    }
+    
+    return parts.join(' + ');
+  }
+
+  // Auto-save draft whenever state changes
+  useEffect(() => {
+    saveDraft({ name, address, email, pgp, mp, pro4, drip, zones, valves, timer, price, priceOverride, notes, sidewalk, other });
+  }, [name, address, email, pgp, mp, pro4, drip, zones, valves, timer, price, priceOverride, notes, sidewalk, other]);
+
+  const canNext = [
+    name.trim().length > 0 && address.trim().length > 0,
+    totalHeads > 0 || drip > 0,
+    displayPrice.length > 0,
+    true,
+  ];
+
+  function reset() {
+    clearDraft();
+    setStep(0); setDone(false);
+    setName(""); setAddress(""); setEmail("");
+    setPgp(0); setMp(0); setPro4(0);
+    setDrip(0); setZones(0); setValves(0);
+    setTimer(TIMER_OPTIONS[0]);
+    setPrice(""); setPriceOverride(""); setNotes(""); setSidewalk(""); setOther("");
+  }
+
+  const [pdfId, setPdfId] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [customMessage, setCustomMessage] = useState("");
+  
+  async function generate() {
+    setLoading(true);
+    
+    const estimateData = {
+      customer_name: name,
+      customer_address: address,
+      customer_email: email,
+      date: proposalDate,
+      hunter_pgp_ultra: String(pgp),
+      mp_rotor_nozzle: String(mp),
+      hunter_pro4_spray: String(pro4),
+      drip_zones: String(drip),
+      number_of_zones: String(zones),
+      irritrol_valves: String(valves),
+      hydrawise_timer: timer,
+      price: displayPrice,
+      notes: notes,
+      sidewalk_strip: sidewalk,
+      other_addon: other,
+      // User info for email sending
+      prepared_by_name: currentUser?.name || "W.L. Toomey Irrigation",
+      prepared_by_email: currentUser?.email || "",
+      smtp_user: currentUser?.email || "",
+      smtp_password: currentUser?.smtp_password || ""
+    };
+    
+    try {
+      // Replace with your Render URL after deployment
+      const BACKEND_URL = 'https://toomey-backend-production.up.railway.app';
+      
+      const response = await fetch(`${BACKEND_URL}/generate-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(estimateData)
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setPdfId(result.pdf_id);
+      } else {
+        alert('Failed to generate PDF: ' + (result.error || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      alert('Failed to connect to PDF generator. Please check your connection.');
+    }
+    
+    setLoading(false);
+    setDone(true);
+  }
+  
+  async function sendToClient() {
+    if (!pdfId) return;
+    
+    setSendingEmail(true);
+    
+    try {
+      const BACKEND_URL = 'https://toomey-backend-production.up.railway.app';
+      
+      const response = await fetch(`${BACKEND_URL}/send-pdf/${pdfId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: customMessage.trim() })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(`✅ Proposal sent to ${email}!`);
+        setCustomMessage(""); // Clear message after sending
+      } else {
+        alert('Failed to send email: ' + (result.error || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('Email send failed:', err);
+      alert('Failed to send email. Please try again.');
+    }
+    
+    setSendingEmail(false);
+  }
+
+  // ── Done screen ────────────────────────────────────────────────────────────
+  if (done) {
+    return (
+      <div id="app-inner">
+        <div className="brand">
+          <div className="brand-icon">💧</div>
+          <div>
+            <div className="brand-sub">W.L. Toomey Irrigation</div>
+            <div className="brand-title">Estimate Builder</div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="done-header">
+            <div className="done-emoji">✅</div>
+            <div className="done-title">Proposal Complete!</div>
+            <div className="done-sub">W.L. Toomey Irrigation · {proposalDate}</div>
+          </div>
+          <div className="card-body">
+            <div className="customer-banner">
+              <div className="customer-name">{name}</div>
+              <div className="customer-address">{address}</div>
+              {email && <div className="customer-email">{email}</div>}
+              <div className="customer-date">Prepared: {proposalDate}</div>
+            </div>
+
+            <InnerCard title="🌀 System">
+              <Row label="Hunter PGP-Ultra Rotary" value={pgp  > 0 ? `${pgp} heads`  : null} />
+              <Row label="Rotor Streamer"          value={mp   > 0 ? `${mp} heads`   : null} />
+              <Row label="Hunter Pro-4 Spray"      value={pro4 > 0 ? `${pro4} heads` : null} />
+              <Row label="Total Heads"             value={totalHeads} accent />
+              <Row label="Drip Zones"              value={drip   > 0 ? drip   : null} />
+              <Row label="# of Zones"              value={zones  > 0 ? zones  : null} />
+              <Row label="Irritrol Valves"         value={valves > 0 ? valves : null} />
+              <Row label="Controller"              value={timer} />
+            </InnerCard>
+
+            {(sidewalk || other) && (
+              <InnerCard title="✨ Add-Ons">
+                <Row label="Sidewalk Strip" value={sidewalk} />
+                <Row label="Other"          value={other} />
+              </InnerCard>
+            )}
+
+            {notes && (
+              <InnerCard title="📝 Notes">
+                <p style={{margin:0,fontSize:15,color:"#475569",lineHeight:1.6}}>{notes}</p>
+              </InnerCard>
+            )}
+
+            <div className="price-callout">
+              <div>
+                <div className="price-label">Total Price</div>
+                <div className="price-val">${displayPrice}</div>
+                <div className="price-note">Excl. plumbing / backflow</div>
+              </div>
+              <span style={{fontSize:48}}>💰</span>
+            </div>
+
+            {/* Preview & Send buttons */}
+            {pdfId ? (
+              <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                <a
+                  href={`https://toomey-backend-production.up.railway.app/preview-pdf/${pdfId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display:'block',padding:'16px 20px',borderRadius:14,
+                    background:'linear-gradient(135deg,#1a3a6b,#2563eb)',
+                    color:'white',textAlign:'center',fontSize:17,fontWeight:700,
+                    textDecoration:'none',boxShadow:'0 4px 16px rgba(37,99,235,0.35)'
+                  }}
+                >
+                  📄 Preview PDF
+                </a>
+                
+                {email && (
+                  <>
+                    {/* Custom message input */}
+                    <div style={{background:'#f8fafc',borderRadius:14,padding:'16px 18px'}}>
+                      <label style={{fontSize:12,fontWeight:700,color:'#475569',letterSpacing:'0.04em',textTransform:'uppercase',display:'block',marginBottom:8}}>
+                        ✏️ Add Personal Note (Optional)
+                      </label>
+                      <textarea
+                        value={customMessage}
+                        onChange={e => setCustomMessage(e.target.value)}
+                        placeholder="e.g., Great meeting you today! Looking forward to working with you."
+                        rows={3}
+                        style={{
+                          width:'100%',padding:'12px 14px',border:'1.5px solid #e2e8f0',
+                          borderRadius:10,fontSize:15,fontFamily:'inherit',
+                          background:'white',color:'#1e293b',outline:'none',
+                          resize:'vertical',boxSizing:'border-box'
+                        }}
+                      />
+                      <div style={{fontSize:12,color:'#64748b',marginTop:6}}>
+                        This will be added to the email before sending.
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={sendToClient}
+                      disabled={sendingEmail}
+                      style={{
+                        padding:'16px 20px',borderRadius:14,border:'2px solid #10b981',
+                        background:'white',color:'#10b981',fontSize:17,fontWeight:700,
+                        cursor:sendingEmail?'default':'pointer',
+                        opacity:sendingEmail?0.6:1
+                      }}
+                    >
+                      {sendingEmail ? '📧 Sending...' : `📧 Send to ${name}`}
+                    </button>
+                  </>
+                )}
+                
+                {!email && (
+                  <div className="banner-yellow">
+                    ⚠️ No customer email provided — cannot auto-send proposal. Preview PDF above and email manually.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="banner-blue">
+                <strong>⚙️ Backend Setup Required:</strong> Deploy the backend server to enable PDF generation. See <code>DEPLOY.md</code> in the backend folder.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="nav-bar">
+          <button className="nav-btn-back" onClick={() => { setDone(false); setStep(3); }}>← Edit</button>
+          <button className="nav-btn-primary" onClick={reset}>+ New Estimate</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── User selection screen ──────────────────────────────────────────────────
+  if (!currentUser) {
+    return (
+      <div id="app-inner">
+        <div className="brand">
+          <div className="brand-icon">💧</div>
+          <div>
+            <div className="brand-sub">W.L. Toomey Irrigation</div>
+            <div className="brand-title">Estimate Builder</div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header" style={{textAlign:'center',padding:'32px 24px'}}>
+            <div style={{fontSize:22,fontWeight:700,color:'white',marginBottom:6}}>Who's Using the App?</div>
+            <div style={{fontSize:14,opacity:0.8,color:'white'}}>Select your name to continue</div>
+          </div>
+          <div className="card-body">
+            {TEAM_MEMBERS.map((member, i) => (
+              <div
+                key={i}
+                onClick={() => {
+                  // Prompt for email password
+                  const password = prompt(`Enter your email password for ${member.email}:\n\n(This is stored locally on your iPad only)`);
+                  if (password) {
+                    const user = { ...member, smtp_password: password };
+                    saveUser(user);
+                    setCurrentUser(user);
+                  }
+                }}
+                style={{
+                  background:'#f8fafc',borderRadius:16,padding:'20px 24px',
+                  cursor:'pointer',border:'2px solid #e2e8f0',
+                  marginBottom:12,transition:'all 0.2s',
+                  WebkitTapHighlightColor:'transparent'
+                }}
+                onMouseEnter={e => {e.target.style.borderColor='#2563eb'; e.target.style.background='#eff6ff';}}
+                onMouseLeave={e => {e.target.style.borderColor='#e2e8f0'; e.target.style.background='#f8fafc';}}
+              >
+                <div style={{fontSize:18,fontWeight:700,color:'#1a3a6b',marginBottom:4}}>{member.name}</div>
+                <div style={{fontSize:14,color:'#64748b'}}>{member.title}</div>
+                <div style={{fontSize:13,color:'#94a3b8',marginTop:4}}>{member.email}</div>
+              </div>
+            ))}
+            
+            <div style={{marginTop:24,padding:16,background:'#fffbeb',borderRadius:12,border:'1px solid #fde68a'}}>
+              <p style={{margin:0,fontSize:13,color:'#92400e',lineHeight:1.6}}>
+                <strong>🔒 Your password is stored securely on this iPad only.</strong> It's never sent anywhere except directly to your email provider when sending proposals.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main form ──────────────────────────────────────────────────────────────
+  return (
+    <div id="app-inner">
+      {/* User indicator in brand bar */}
+      <div className="brand">
+        <div className="brand-icon">💧</div>
+        <div style={{flex:1}}>
+          <div className="brand-sub">W.L. Toomey Irrigation</div>
+          <div className="brand-title">Estimate Builder</div>
+        </div>
+        <button
+          onClick={() => {
+            if (confirm(`Switch user?\n\nCurrently: ${currentUser.name}`)) {
+              clearUser();
+              setCurrentUser(null);
+            }
+          }}
+          style={{
+            padding:'8px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.3)',
+            background:'rgba(255,255,255,0.1)',color:'white',fontSize:12,fontWeight:600,
+            cursor:'pointer',WebkitTapHighlightColor:'transparent'
+          }}
+        >
+          {currentUser.name.split(' ')[0]} ▾
+        </button>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <StepBar step={step} />
+        </div>
+
+        <div className="card-body">
+
+          {/* ── Step 0: Customer ─────────────────────────────────────────── */}
+          {step === 0 && <>
+            <div>
+              <div className="section-title">Customer Information</div>
+              <div className="section-sub">Appears on the proposal cover page.</div>
+            </div>
+            <Field label="Customer Name"            value={name}    onChange={setName}    placeholder="John & Jane Smith"                   icon="👤" />
+            <AddressField label="Property Address"  value={address} onChange={setAddress} placeholder="123 Oak Street, Lexington, MA 02420" icon="🏡" />
+            <Field label="Email Address (optional)" value={email}   onChange={setEmail}   placeholder="john@example.com"                    icon="✉️" type="email" />
+            <div className="banner-date">
+              <span style={{fontSize:22}}>📅</span>
+              <div>
+                <div className="banner-date-label">Proposal Date</div>
+                <div className="banner-date-val">{proposalDate}</div>
+              </div>
+            </div>
+            {!canNext[0] && <p className="hint">Name and address required to continue</p>}
+          </>}
+
+          {/* ── Step 1: System ───────────────────────────────────────────── */}
+          {step === 1 && <>
+            <div>
+              <div className="section-title">System Specifications</div>
+              <div className="section-sub">Tap +/− to set quantities for each component.</div>
+            </div>
+            <InnerCard title="🌀 Spray & Rotary Heads">
+              <Stepper label="Hunter PGP-Ultra Rotary Heads" value={pgp}  onChange={setPgp}  icon="🔵" />
+              <Stepper label="Rotor Streamer Heads"          value={mp}   onChange={setMp}   icon="🟢" />
+              <Stepper label="Hunter Pro-4 Spray Heads"      value={pro4} onChange={setPro4} icon="🟡" />
+              <div className="total-pill">
+                <span className="total-pill-label">Total Heads</span>
+                <span className="total-pill-val">{totalHeads}</span>
+              </div>
+            </InnerCard>
+            <InnerCard title="🔧 Zones & Valves">
+              <Stepper label="Drip Zones"          value={drip}   onChange={setDrip}   icon="💧" />
+              <Stepper label="Number of Zones"     value={zones}  onChange={setZones}  icon="🗺" />
+              <Stepper label="Irritrol 2400T Valves" value={valves} onChange={setValves} icon="🔩" />
+            </InnerCard>
+            <InnerCard title="📡 Controller">
+              <SelectField label="Controller Model" value={timer} onChange={setTimer} options={TIMER_OPTIONS} />
+            </InnerCard>
+            {!canNext[1] && <p className="hint">Add at least one head or drip zone to continue</p>}
+          </>}
+
+          {/* ── Step 2: Add-Ons & Price ──────────────────────────────────── */}
+          {step === 2 && <>
+            <div>
+              <div className="section-title">Add-Ons & Pricing</div>
+              <div className="section-sub">Auto-calculated based on system specs. You can override if needed.</div>
+            </div>
+            <InnerCard title="💰 Proposal Price">
+              {/* Show auto-calculated price */}
+              <div style={{background:"#f0f9ff",borderRadius:12,padding:"14px 16px",marginBottom:12}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#0369a1",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>
+                  Auto-Calculated Price
+                </div>
+                <div style={{fontSize:28,fontWeight:700,color:"#0c4a6e",fontFamily:"Georgia,serif",marginBottom:6}}>
+                  ${autoPrice.toLocaleString()}
+                </div>
+                {(totalHeads > 0 || drip > 0) && (
+                  <div style={{fontSize:13,color:"#0369a1",lineHeight:1.5}}>
+                    {getPriceBreakdown()}
+                  </div>
+                )}
+              </div>
+              
+              {/* Override field */}
+              <Field 
+                label="Override Price (optional - leave blank to use auto-calculated)" 
+                value={priceOverride} 
+                onChange={setPriceOverride} 
+                placeholder={`Auto: ${autoPrice.toLocaleString()}`}
+                icon="✏️" 
+              />
+              <div className="banner-yellow">Plumbing / backflow preventer is billed separately per local code requirements.</div>
+            </InnerCard>
+            <InnerCard title="✨ Optional Add-Ons">
+              <Field label="Sidewalk Strip" value={sidewalk} onChange={setSidewalk} placeholder="e.g. 6 spray heads – $450"      icon="🚶" />
+              <Field label="Other Add-On"   value={other}    onChange={setOther}    placeholder="e.g. Rain/freeze sensor – $150" icon="🌧" />
+            </InnerCard>
+            <InnerCard title="📝 Notes">
+              <AreaField label="Additional Notes" value={notes} onChange={setNotes} placeholder="e.g. Zone 1–3 front lawn, Zone 4–5 backyard..." icon="📋" />
+            </InnerCard>
+          </>}
+
+          {/* ── Step 3: Review ───────────────────────────────────────────── */}
+          {step === 3 && <>
+            <div>
+              <div className="section-title">Review Estimate</div>
+              <div className="section-sub">Confirm before generating the proposal.</div>
+            </div>
+            <InnerCard title="👤 Customer">
+              <Row label="Name"    value={name}           accent />
+              <Row label="Address" value={address} />
+              <Row label="Email"   value={email || "—"} />
+              <Row label="Date"    value={proposalDate} />
+            </InnerCard>
+            <InnerCard title="🌀 System">
+              <Row label="Hunter PGP-Ultra Rotary" value={pgp   > 0 ? pgp   : null} />
+              <Row label="Rotor Streamer"          value={mp    > 0 ? mp    : null} />
+              <Row label="Hunter Pro-4 Spray"      value={pro4  > 0 ? pro4  : null} />
+              <Row label="Total Heads"             value={totalHeads} accent />
+              <Row label="Drip Zones"              value={drip   > 0 ? drip   : null} />
+              <Row label="# of Zones"              value={zones  > 0 ? zones  : null} />
+              <Row label="Irritrol Valves"         value={valves > 0 ? valves : null} />
+              <Row label="Controller"              value={timer} />
+            </InnerCard>
+            {(sidewalk || other || notes) && (
+              <InnerCard title="✨ Add-Ons & Notes">
+                <Row label="Sidewalk Strip" value={sidewalk} />
+                <Row label="Other"          value={other} />
+                {notes && <p style={{margin:0,paddingTop:8,fontSize:15,color:"#475569",lineHeight:1.6}}>{notes}</p>}
+              </InnerCard>
+            )}
+            <div className="price-callout">
+              <div>
+                <div className="price-label">Total Price</div>
+                <div className="price-val">${displayPrice}</div>
+                <div className="price-note">Excludes plumbing</div>
+              </div>
+              <span style={{fontSize:50}}>💧</span>
+            </div>
+          </>}
+
+        </div>{/* card-body */}
+      </div>{/* card */}
+
+      {/* ── Sticky bottom nav ───────────────────────────────────────────────── */}
+      <div className="nav-bar">
+        {step > 0 && (
+          <button className="nav-btn-back" onClick={() => setStep(s => s - 1)}>← Back</button>
+        )}
+        {step < 3
+          ? <button className="nav-btn-primary" disabled={!canNext[step]} onClick={() => { if (canNext[step]) setStep(s => s + 1); }}>
+              Continue →
+            </button>
+          : <button className="nav-btn-primary" disabled={loading} onClick={generate}>
+              {loading ? "⏳  Generating…" : "📄  Generate Proposal"}
+            </button>
+        }
+      </div>
+
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("app")).render(<App />);
+</script>
+
+<!-- Register service worker for offline support -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
