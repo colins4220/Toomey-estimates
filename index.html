@@ -285,6 +285,7 @@
     /* Hidden utility */
     .hidden { display: none !important; }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -1104,6 +1105,200 @@ function PhotoMarkupModal({ photo, onSave, onCancel }) {
   );
 }
 
+// ── PDF Generation ────────────────────────────────────────────────────────────
+async function generateJobPDF(jobType, customer, photos, selectedItems, laborHours, laborRate, laborTotal, matTotal, taxTotal, grandTotal, notes, currentUser) {
+  if (!window.jspdf) throw new Error('jsPDF not loaded');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+  const W = 612, H = 792, M = 50, CW = 512;
+  const jt = JOB_TYPES.find(j => j.id === jobType) || {};
+  const taxApplies = jobType === 'service_call' || jobType === 'system_recommendations';
+  const fmt = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let y = 0;
+
+  // ── Header ──
+  doc.setFillColor(26, 58, 107);
+  doc.rect(0, 0, W, 110, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.text('W.L. Toomey Irrigation', M, 45);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(12);
+  doc.text(jt.label || jobType, M, 65);
+  doc.setFontSize(9);
+  doc.text(today(), W - M, 45, { align: 'right' });
+  doc.text(`Prepared by: ${currentUser?.name || ''}`, W - M, 61, { align: 'right' });
+  y = 136;
+
+  function sectionHeader(title) {
+    doc.setTextColor(26, 58, 107);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text(title, M, y);
+    y += 5;
+    doc.setDrawColor(26, 58, 107);
+    doc.setLineWidth(1);
+    doc.line(M, y, M + CW, y);
+    y += 14;
+    doc.setTextColor(30, 30, 30);
+  }
+
+  function checkPageBreak(needed) {
+    if (y + needed > H - 55) { doc.addPage(); y = M; }
+  }
+
+  // ── Customer ──
+  checkPageBreak(80);
+  sectionHeader('Customer');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(customer.name, M, y);
+  y += 18;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.setTextColor(80, 80, 80);
+  if (customer.address) { doc.text(customer.address, M, y); y += 15; }
+  if (customer.email)   { doc.text(customer.email,   M, y); y += 15; }
+  if (customer.phone)   { doc.text(customer.phone,   M, y); y += 15; }
+  y += 14;
+
+  // ── Photos ──
+  if (photos.length > 0) {
+    checkPageBreak(60);
+    sectionHeader('Photos');
+    const PW = 240, PH = 175, GAP = CW - 2 * PW;
+    let col = 0, rowY = y;
+    for (let i = 0; i < photos.length; i++) {
+      if (col === 0) { checkPageBreak(PH + 30); rowY = y; }
+      const px = M + col * (PW + GAP);
+      try { doc.addImage(photos[i].dataUrl, 'JPEG', px, rowY, PW, PH); }
+      catch(e) {
+        doc.setFillColor(240, 240, 240);
+        doc.rect(px, rowY, PW, PH, 'F');
+        doc.setTextColor(150, 150, 150);
+        doc.setFontSize(9);
+        doc.text('[Photo]', px + PW / 2, rowY + PH / 2, { align: 'center' });
+        doc.setTextColor(30, 30, 30);
+      }
+      if (photos[i].caption) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text(photos[i].caption, px + PW / 2, rowY + PH + 11, { align: 'center', maxWidth: PW });
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(30, 30, 30);
+      }
+      col++;
+      if (col >= 2) { col = 0; y = rowY + PH + (photos[i-1]?.caption || photos[i].caption ? 26 : 14); rowY = y; }
+    }
+    if (col > 0) y = rowY + PH + 14;
+    y += 10;
+  }
+
+  // ── Materials ──
+  if (selectedItems.length > 0) {
+    checkPageBreak(80);
+    sectionHeader('Materials');
+    doc.setFillColor(241, 245, 249);
+    doc.rect(M, y - 11, CW, 18, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Item',     M + 6,       y);
+    doc.text('Qty',      M + CW - 125, y, { align: 'center' });
+    doc.text('Unit $',   M + CW - 70,  y, { align: 'right' });
+    doc.text('Total',    M + CW,       y, { align: 'right' });
+    y += 10;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    for (const item of selectedItems) {
+      checkPageBreak(22);
+      doc.setTextColor(30, 30, 30);
+      const nm = item.product.name.length > 44 ? item.product.name.slice(0, 44) + '…' : item.product.name;
+      doc.text(nm, M + 6, y);
+      doc.text(String(item.qty),                          M + CW - 125, y, { align: 'center' });
+      doc.text(`$${item.product.price.toFixed(2)}`,       M + CW - 70,  y, { align: 'right' });
+      doc.text(`$${fmt(item.product.price * item.qty)}`,  M + CW,       y, { align: 'right' });
+      y += 5;
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(M, y, M + CW, y);
+      y += 13;
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(26, 58, 107);
+    doc.text('Materials Subtotal', M + CW - 145, y, { align: 'right' });
+    doc.text(`$${fmt(matTotal)}`, M + CW, y, { align: 'right' });
+    y += 16;
+    if (taxApplies) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text('MA Sales Tax (6.25%)', M + CW - 145, y, { align: 'right' });
+      doc.text(`$${fmt(taxTotal)}`, M + CW, y, { align: 'right' });
+      y += 16;
+    }
+    y += 8;
+  }
+
+  // ── Labor ──
+  if (laborHours > 0) {
+    checkPageBreak(60);
+    sectionHeader('Labor');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(30, 30, 30);
+    doc.text(`${laborHours} hour${laborHours !== 1 ? 's' : ''} × $${laborRate}/hr`, M, y);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`$${fmt(laborTotal)}`, M + CW, y, { align: 'right' });
+    y += 22;
+  }
+
+  // ── Notes ──
+  if (notes.trim()) {
+    checkPageBreak(60);
+    sectionHeader('Notes');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(30, 30, 30);
+    const noteLines = doc.splitTextToSize(notes.trim(), CW);
+    checkPageBreak(noteLines.length * 14 + 10);
+    doc.text(noteLines, M, y);
+    y += noteLines.length * 14 + 16;
+  }
+
+  // ── Grand Total ──
+  checkPageBreak(70);
+  y += 8;
+  doc.setFillColor(26, 58, 107);
+  doc.roundedRect(M, y, CW, 52, 6, 6, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('GRAND TOTAL', W / 2, y + 17, { align: 'center' });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(22);
+  doc.text(`$${fmt(grandTotal)}`, W / 2, y + 38, { align: 'center' });
+
+  // ── Footer on every page ──
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p);
+    doc.setFillColor(26, 58, 107);
+    doc.rect(0, H - 36, W, 36, 'F');
+    doc.setTextColor(200, 215, 235);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text('W.L. Toomey Irrigation  ·  (781) 937-0552  ·  www.ToomeyIrrigation.com', W / 2, H - 16, { align: 'center' });
+    doc.setTextColor(160, 180, 210);
+    doc.text(`Page ${p} of ${pageCount}`, W - M, H - 16, { align: 'right' });
+  }
+
+  return doc.output('datauristring');
+}
+
 // ── JobFlow ───────────────────────────────────────────────────────────────────
 function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
   const jt = JOB_TYPES.find(j => j.id === jobType) || {};
@@ -1127,6 +1322,14 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
 
   // Notes
   const [notes, setNotes] = useState('');
+
+  // PDF / Email
+  const [sendStatus, setSendStatus] = useState('idle'); // idle|generating|ready|sending|sent|error
+  const [sendError,  setSendError]  = useState('');
+  const [pdfDataUrl, setPdfDataUrl] = useState('');
+  const [sendEmail,  setSendEmail]  = useState(customer.email || '');
+  const [customMsg,  setCustomMsg]  = useState('');
+  const [ccOffice,   setCcOffice]   = useState(true);
 
   // Totals
   const matTotal   = selectedItems.reduce((s, i) => s + i.product.price * i.qty, 0);
@@ -1196,6 +1399,61 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
     setDone(true);
   }
 
+  // ── PDF / Email ──────────────────────────────────────────────────────────────
+  async function generateAndPreview() {
+    setSendStatus('generating');
+    setSendError('');
+    try {
+      const dataUrl = await generateJobPDF(
+        jobType, customer, photos, selectedItems,
+        laborHours, laborRate, laborTotal, matTotal, taxTotal, grandTotal,
+        notes, currentUser
+      );
+      setPdfDataUrl(dataUrl);
+      setSendStatus('ready');
+    } catch(e) {
+      setSendError(e.message || 'PDF generation failed');
+      setSendStatus('error_gen');
+    }
+  }
+
+  async function sendPDF() {
+    if (!sendEmail.trim()) return;
+    if (!currentUser?.smtp_password) {
+      setSendError('No email password saved. Sign out and sign back in to re-enter your password.');
+      setSendStatus('error');
+      return;
+    }
+    setSendStatus('sending');
+    setSendError('');
+    try {
+      const jt2 = JOB_TYPES.find(j => j.id === jobType) || {};
+      const filename = `Toomey_${customer.name.replace(/\s+/g,'_')}_${(jt2.label||jobType).replace(/\s+/g,'_')}.pdf`;
+      const resp = await fetch('https://toomey-backend-production.up.railway.app/send-job-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pdf_base64:        pdfDataUrl.split(',')[1],
+          filename,
+          to_email:          sendEmail.trim(),
+          customer_name:     customer.name,
+          job_type_label:    jt2.label || jobType,
+          prepared_by_name:  currentUser?.name  || '',
+          prepared_by_email: currentUser?.email || '',
+          smtp_password:     currentUser?.smtp_password || '',
+          message:           customMsg,
+          cc_office:         ccOffice,
+        })
+      });
+      const result = await resp.json();
+      if (!resp.ok || result.error) throw new Error(result.error || 'Send failed');
+      setSendStatus('sent');
+    } catch(e) {
+      setSendError(e.message || 'Failed to send email');
+      setSendStatus('error');
+    }
+  }
+
   // ── Markup modal ─────────────────────────────────────────────────────────────
   if (markupIdx !== null) {
     return <PhotoMarkupModal photo={photos[markupIdx].dataUrl} onSave={saveMarkup} onCancel={() => setMarkupIdx(null)} />;
@@ -1203,6 +1461,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
 
   // ── Done screen ──────────────────────────────────────────────────────────────
   if (done) {
+    const pdfReady = sendStatus === 'ready' || sendStatus === 'sending' || sendStatus === 'sent' || sendStatus === 'error';
     return (
       <div id="app-inner">
         <div className="brand">
@@ -1234,7 +1493,72 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
               </div>
               <span style={{fontSize:44}}>{jt.icon}</span>
             </div>
-            <div className="banner-blue">Saved to Firebase. PDF &amp; email coming in Phase 5.</div>
+
+            {/* ── PDF & Email ── */}
+            <InnerCard title="📄 Proposal PDF">
+              {sendStatus === 'idle' && (
+                <button onClick={generateAndPreview}
+                  style={{width:'100%',padding:'14px',borderRadius:12,border:'none',background:'#1a3a6b',color:'white',fontSize:16,fontWeight:700,cursor:'pointer'}}>
+                  Generate PDF
+                </button>
+              )}
+              {sendStatus === 'generating' && (
+                <div style={{textAlign:'center',padding:'14px',color:'#64748b',fontSize:15}}>⏳ Generating PDF…</div>
+              )}
+              {sendStatus === 'error_gen' && (
+                <>
+                  <div style={{padding:'10px 14px',borderRadius:10,background:'#fef2f2',border:'1.5px solid #fca5a5',color:'#dc2626',fontSize:14,marginBottom:10}}>{sendError}</div>
+                  <button onClick={generateAndPreview}
+                    style={{width:'100%',padding:'12px',borderRadius:10,border:'none',background:'#1a3a6b',color:'white',fontSize:15,fontWeight:700,cursor:'pointer'}}>
+                    Try Again
+                  </button>
+                </>
+              )}
+              {pdfReady && (
+                <>
+                  <div style={{display:'flex',gap:8,marginBottom:14}}>
+                    <a href={pdfDataUrl} target="_blank" rel="noreferrer"
+                      style={{flex:1,padding:'11px 8px',textAlign:'center',background:'#eff6ff',border:'1.5px solid #2563eb',borderRadius:10,color:'#2563eb',fontWeight:700,fontSize:14,textDecoration:'none'}}>
+                      👁 Preview
+                    </a>
+                    <a href={pdfDataUrl} download={`Toomey_${customer.name.replace(/\s+/g,'_')}_${(jt.label||jobType).replace(/\s+/g,'_')}.pdf`}
+                      style={{flex:1,padding:'11px 8px',textAlign:'center',background:'#f0fdf4',border:'1.5px solid #16a34a',borderRadius:10,color:'#16a34a',fontWeight:700,fontSize:14,textDecoration:'none'}}>
+                      ⬇ Download
+                    </a>
+                  </div>
+                  <div style={{marginBottom:10}}>
+                    <label className="field-label">Send to (email)</label>
+                    <input type="email" value={sendEmail} onChange={e=>setSendEmail(e.target.value)}
+                      placeholder="customer@email.com"
+                      style={{width:'100%',padding:'11px 14px',borderRadius:10,border:'1.5px solid #e2e8f0',fontSize:15,fontFamily:'inherit'}}
+                    />
+                  </div>
+                  <div style={{marginBottom:10}}>
+                    <label className="field-label">Personal note (optional)</label>
+                    <textarea value={customMsg} onChange={e=>setCustomMsg(e.target.value)}
+                      placeholder="Add a personal note to the email…" rows={3}
+                      style={{width:'100%',padding:'11px 14px',borderRadius:10,border:'1.5px solid #e2e8f0',fontSize:14,fontFamily:'inherit',resize:'vertical'}}
+                    />
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+                    <input type="checkbox" id="ccOffice" checked={ccOffice} onChange={e=>setCcOffice(e.target.checked)} style={{width:16,height:16,cursor:'pointer'}} />
+                    <label htmlFor="ccOffice" style={{fontSize:14,color:'#64748b',cursor:'pointer'}}>CC office (info@toomeyirrigation.com)</label>
+                  </div>
+                  {(sendStatus === 'error') && (
+                    <div style={{padding:'10px 14px',borderRadius:10,background:'#fef2f2',border:'1.5px solid #fca5a5',color:'#dc2626',fontSize:14,marginBottom:10}}>{sendError}</div>
+                  )}
+                  {sendStatus === 'sent' && (
+                    <div style={{padding:'10px 14px',borderRadius:10,background:'#f0fdf4',border:'1.5px solid #86efac',color:'#166534',fontSize:14,fontWeight:600,marginBottom:10}}>✅ Email sent successfully!</div>
+                  )}
+                  {sendStatus !== 'sent' && (
+                    <button onClick={sendPDF} disabled={sendStatus==='sending'||!sendEmail.trim()}
+                      style={{width:'100%',padding:'14px',borderRadius:12,border:'none',background:sendEmail.trim()?'#1a3a6b':'#cbd5e1',color:'white',fontSize:16,fontWeight:700,cursor:sendEmail.trim()?'pointer':'default'}}>
+                      {sendStatus === 'sending' ? '⏳ Sending…' : '📧 Send to Customer & Office'}
+                    </button>
+                  )}
+                </>
+              )}
+            </InnerCard>
           </div>
         </div>
         <div className="nav-bar">
