@@ -1320,8 +1320,9 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
   const jt = JOB_TYPES.find(j => j.id === jobType) || {};
   const STEPS = ['Photos', 'Materials', 'Review'];
   const [step, setStep]     = useState(0);
-  const [done, setDone]     = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [done, setDone]       = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [acceptUrl, setAcceptUrl] = useState('');
 
   // Photos
   const [photos, setPhotos]         = useState([]);
@@ -1393,8 +1394,8 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
   async function submit() {
     setSaving(true);
     try {
+      const jobId = `job_${Date.now()}`;
       if (window.TFB) {
-        const jobId = `job_${Date.now()}`;
         const photoData = await Promise.all(photos.map(async (p, i) => {
           const url = await window.TFB.uploadPhoto(p.dataUrl, `jobs/${jobId}_photo${i}.jpg`);
           return { url, caption: p.caption };
@@ -1411,6 +1412,29 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
           preparedByEmail: currentUser?.email || '',
         });
       }
+      // Sync to Google Sheets
+      try {
+        const sheetsResp = await fetch('https://toomey-backend-production.up.railway.app/sync-to-sheets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobType,
+            firebaseId:      jobId,
+            customerName:    customer.name,
+            customerAddress: customer.address || '',
+            customerPhone:   customer.phone   || '',
+            customerEmail:   customer.email   || '',
+            preparedBy:      currentUser?.name  || '',
+            materialsTotal:  matTotal,
+            tax:             taxTotal,
+            laborTotal,
+            grandTotal,
+            notes,
+          })
+        });
+        const sheetsResult = await sheetsResp.json();
+        if (sheetsResult.acceptUrl) setAcceptUrl(sheetsResult.acceptUrl);
+      } catch(e) { console.warn('Sheets sync failed (non-fatal):', e); }
     } catch(e) { console.error('Submit error:', e); }
     setSaving(false);
     setDone(true);
@@ -1463,6 +1487,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
           smtp_password:     currentUser?.smtp_password || '',
           message:           customMsg,
           cc_office:         ccOffice,
+          accept_url:        acceptUrl,
         })
       });
       const result = await resp.json();
