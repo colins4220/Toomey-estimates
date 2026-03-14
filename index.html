@@ -1291,12 +1291,15 @@ async function generateJobPDF(jobType, customer, photos, selectedItems, laborHou
     doc.setTextColor(200, 215, 235);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    doc.text('W.L. Toomey Irrigation  ·  (781) 937-0552  ·  www.ToomeyIrrigation.com', W / 2, H - 16, { align: 'center' });
+    doc.text('W.L. Toomey Irrigation  ·  (781) 937-0552  ·  www.ToomeyIrrigation.com  ·  info@toomeyirrigation.com', W / 2, H - 16, { align: 'center' });
     doc.setTextColor(160, 180, 210);
     doc.text(`Page ${p} of ${pageCount}`, W - M, H - 16, { align: 'right' });
   }
 
-  return doc.output('datauristring');
+  const blob    = doc.output('blob');
+  const blobUrl = URL.createObjectURL(blob);
+  const dataUrl = doc.output('datauristring');
+  return { blob, blobUrl, dataUrl };
 }
 
 // ── JobFlow ───────────────────────────────────────────────────────────────────
@@ -1327,6 +1330,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
   const [sendStatus, setSendStatus] = useState('idle'); // idle|generating|ready|sending|sent|error
   const [sendError,  setSendError]  = useState('');
   const [pdfDataUrl, setPdfDataUrl] = useState('');
+  const [pdfBlobUrl, setPdfBlobUrl] = useState('');
   const [sendEmail,  setSendEmail]  = useState(customer.email || '');
   const [customMsg,  setCustomMsg]  = useState('');
   const [ccOffice,   setCcOffice]   = useState(true);
@@ -1404,11 +1408,14 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
     setSendStatus('generating');
     setSendError('');
     try {
-      const dataUrl = await generateJobPDF(
+      const { blobUrl, dataUrl } = await generateJobPDF(
         jobType, customer, photos, selectedItems,
         laborHours, laborRate, laborTotal, matTotal, taxTotal, grandTotal,
         notes, currentUser
       );
+      // Revoke any previous blob URL to free memory
+      if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+      setPdfBlobUrl(blobUrl);
       setPdfDataUrl(dataUrl);
       setSendStatus('ready');
     } catch(e) {
@@ -1449,7 +1456,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
       if (!resp.ok || result.error) throw new Error(result.error || 'Send failed');
       setSendStatus('sent');
     } catch(e) {
-      setSendError(e.message || 'Failed to send email');
+      setSendError(`Send failed: ${e.message || 'Network error — check your connection and try again.'}`);
       setSendStatus('error');
     }
   }
@@ -1517,11 +1524,11 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
               {pdfReady && (
                 <>
                   <div style={{display:'flex',gap:8,marginBottom:14}}>
-                    <a href={pdfDataUrl} target="_blank" rel="noreferrer"
+                    <a href={pdfBlobUrl} target="_blank" rel="noreferrer"
                       style={{flex:1,padding:'11px 8px',textAlign:'center',background:'#eff6ff',border:'1.5px solid #2563eb',borderRadius:10,color:'#2563eb',fontWeight:700,fontSize:14,textDecoration:'none'}}>
                       👁 Preview
                     </a>
-                    <a href={pdfDataUrl} download={`Toomey_${customer.name.replace(/\s+/g,'_')}_${(jt.label||jobType).replace(/\s+/g,'_')}.pdf`}
+                    <a href={pdfBlobUrl} download={`Toomey_${customer.name.replace(/\s+/g,'_')}_${(jt.label||jobType).replace(/\s+/g,'_')}.pdf`}
                       style={{flex:1,padding:'11px 8px',textAlign:'center',background:'#f0fdf4',border:'1.5px solid #16a34a',borderRadius:10,color:'#16a34a',fontWeight:700,fontSize:14,textDecoration:'none'}}>
                       ⬇ Download
                     </a>
