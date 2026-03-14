@@ -325,19 +325,17 @@ window.TFB={
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 
 <script>
-// Pre-load logo for PDF generation (runs instantly, doesn't block Babel)
-(function() {
-  var img = new Image();
-  img.onload = function() {
-    var c = document.createElement('canvas');
-    c.width = img.width; c.height = img.height;
-    c.getContext('2d').drawImage(img, 0, 0);
-    window._TOOMEY_LOGO_DATA = c.toDataURL('image/png');
+(function(){
+  var img=new Image();
+  img.onload=function(){
+    var c=document.createElement('canvas');
+    c.width=img.width;c.height=img.height;
+    c.getContext('2d').drawImage(img,0,0);
+    window._TOOMEY_LOGO_DATA=c.toDataURL('image/png');
   };
-  img.src = 'ToomeyLogo2026.png';
+  img.src='ToomeyLogo2026.png';
 })();
 </script>
-
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
 
@@ -353,7 +351,6 @@ const TEAM_MEMBERS = [
   { name: "Jerry Toomey", email: "jerry@toomeyirrigation.com", title: "Co-Owner" },
   { name: "Colin Smith", email: "colin@toomeyirrigation.com", title: "Team Member" },
 ];
-
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -757,7 +754,7 @@ function CustomerSelect({ jobType, onSelect, onBack }) {
     return (
       <div id="app-inner">
         <div className="brand">
-          <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:10}} alt="Toomey" /></div>
+          <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:"100%",height:"100%",objectFit:"contain",borderRadius:8}} alt="" /></div>
           <div style={{flex:1}}><div className="brand-sub">W.L. Toomey Irrigation</div><div className="brand-title">New Customer</div></div>
         </div>
         <div className="card">
@@ -782,7 +779,7 @@ function CustomerSelect({ jobType, onSelect, onBack }) {
   return (
     <div id="app-inner">
       <div className="brand">
-        <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:10}} alt="Toomey" /></div>
+        <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:"100%",height:"100%",objectFit:"contain",borderRadius:8}} alt="" /></div>
         <div style={{flex:1}}><div className="brand-sub">W.L. Toomey Irrigation</div><div className="brand-title">{jt.label}</div></div>
         <div style={{width:38,height:38,borderRadius:10,background:`linear-gradient(135deg,${jt.color},${jt.color}bb)`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>{jt.icon}</div>
       </div>
@@ -851,7 +848,7 @@ function JobPlaceholder({ jobType, customer, onBack }) {
   return (
     <div id="app-inner">
       <div className="brand">
-        <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:10}} alt="Toomey" /></div>
+        <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:"100%",height:"100%",objectFit:"contain",borderRadius:8}} alt="" /></div>
         <div><div className="brand-sub">W.L. Toomey Irrigation</div><div className="brand-title">{jt.label}</div></div>
       </div>
       <div className="card">
@@ -1134,20 +1131,17 @@ async function generateJobPDF(jobType, customer, photos, selectedItems, laborHou
   // ── Header ──
   doc.setFillColor(26, 58, 107);
   doc.rect(0, 0, W, 120, 'F');
-  // Logo (left side)
-  try { if(window._TOOMEY_LOGO_DATA) doc.addImage(window._TOOMEY_LOGO_DATA, 'PNG', M, 10, 100, 100); } catch(e) {}
-  // Company name + job type (right of logo)
+  try { if(window._TOOMEY_LOGO_DATA) doc.addImage(window._TOOMEY_LOGO_DATA,'PNG',M,10,100,100); } catch(e){}
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.text('W.L. Toomey Irrigation', M + 110, 46);
+  doc.setFontSize(20);
+  doc.text('W.L. Toomey Irrigation', M+110, 45);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(12);
-  doc.text(jt.label || jobType, M + 110, 64);
-  // Date + prepared by (right side)
+  doc.text(jt.label || jobType, M+110, 65);
   doc.setFontSize(9);
-  doc.text(today(), W - M, 46, { align: 'right' });
-  doc.text(`Prepared by: ${currentUser?.name || ''}`, W - M, 62, { align: 'right' });
+  doc.text(today(), W - M, 45, { align: 'right' });
+  doc.text(`Prepared by: ${currentUser?.name || ''}`, W - M, 61, { align: 'right' });
   y = 146;
 
   function sectionHeader(title) {
@@ -1491,7 +1485,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
     return (
       <div id="app-inner">
         <div className="brand">
-          <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:10}} alt="Toomey" /></div>
+          <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:"100%",height:"100%",objectFit:"contain",borderRadius:8}} alt="" /></div>
           <div><div className="brand-sub">W.L. Toomey Irrigation</div><div className="brand-title">{jt.label}</div></div>
         </div>
         <div className="card">
@@ -1599,7 +1593,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
   return (
     <div id="app-inner">
       <div className="brand">
-        <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:10}} alt="Toomey" /></div>
+        <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:"100%",height:"100%",objectFit:"contain",borderRadius:8}} alt="" /></div>
         <div style={{flex:1}}><div className="brand-sub">W.L. Toomey Irrigation</div><div className="brand-title">{jt.label}</div></div>
         <div style={{width:38,height:38,borderRadius:10,background:`linear-gradient(135deg,${jt.color},${jt.color}bb)`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>{jt.icon}</div>
       </div>
@@ -1834,7 +1828,7 @@ const JOB_TYPES = [
   { id: 'new_installation',      label: 'New Installation',      icon: '🌱', color: '#1a3a6b', desc: 'Full system design & estimate' },
   { id: 'revamp',                label: 'Re-Vamp',                icon: '🔧', color: '#0284c7', desc: 'Larger scope project that needs Machine' },
   { id: 'service_call',          label: 'Service Call',           icon: '🛠', color: '#0f766e', desc: "Urgent calls that NEED to be done, but couldn't be done on initial visit. (URGENT)" },
-  { id: 'system_recommendations',label: 'System Recommendations', icon: '💡', color: '#6d28d9', desc: 'Upgrades/Improvements/Potential Issues that tech sees, but customer doesn't. (blocked heads, WiFi upgrade, peened solenoids, etc.)' },
+  { id: 'system_recommendations',label: 'System Recommendations', icon: '💡', color: '#6d28d9', desc: 'Upgrades/Improvements/Potential Issues that tech sees, but customer doesn\'t. (blocked heads, WiFi upgrade, peened solenoids, etc.)' },
 ];
 
 // ── HomeScreen ────────────────────────────────────────────────────────────────
@@ -1842,7 +1836,7 @@ function HomeScreen({ currentUser, onSelect, onSwitchUser }) {
   return (
     <div id="app-inner">
       <div className="brand">
-        <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:10}} alt="Toomey" /></div>
+        <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:"100%",height:"100%",objectFit:"contain",borderRadius:8}} alt="" /></div>
         <div style={{flex:1}}>
           <div className="brand-sub">W.L. Toomey Irrigation</div>
           <div className="brand-title">Estimate Builder</div>
@@ -1889,7 +1883,7 @@ function ComingSoon({ jobType, onBack }) {
   return (
     <div id="app-inner">
       <div className="brand">
-        <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:10}} alt="Toomey" /></div>
+        <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:"100%",height:"100%",objectFit:"contain",borderRadius:8}} alt="" /></div>
         <div>
           <div className="brand-sub">W.L. Toomey Irrigation</div>
           <div className="brand-title">{jt.label}</div>
@@ -2117,7 +2111,7 @@ function App() {
     return (
       <div id="app-inner">
         <div className="brand">
-          <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:10}} alt="Toomey" /></div>
+          <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:"100%",height:"100%",objectFit:"contain",borderRadius:8}} alt="" /></div>
           <div>
             <div className="brand-sub">W.L. Toomey Irrigation</div>
             <div className="brand-title">Estimate Builder</div>
@@ -2254,7 +2248,7 @@ function App() {
     return (
       <div id="app-inner">
         <div className="brand">
-          <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:10}} alt="Toomey" /></div>
+          <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:"100%",height:"100%",objectFit:"contain",borderRadius:8}} alt="" /></div>
           <div>
             <div className="brand-sub">W.L. Toomey Irrigation</div>
             <div className="brand-title">Estimate Builder</div>
@@ -2352,7 +2346,7 @@ function App() {
     <div id="app-inner">
       {/* User indicator in brand bar */}
       <div className="brand">
-        <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:10}} alt="Toomey" /></div>
+        <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:"100%",height:"100%",objectFit:"contain",borderRadius:8}} alt="" /></div>
         <div style={{flex:1}}>
           <div className="brand-sub">W.L. Toomey Irrigation</div>
           <div className="brand-title">Estimate Builder</div>
