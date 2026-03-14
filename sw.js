@@ -1,7 +1,7 @@
 // W.L. Toomey Irrigation Estimator — Service Worker
 // Caches all app assets so it works fully offline (important on job sites)
 
-const CACHE_NAME = "toomey-estimator-v1";
+const CACHE_NAME = "toomey-estimator-v2";
 
 // Everything the app needs to run offline
 const ASSETS = [
