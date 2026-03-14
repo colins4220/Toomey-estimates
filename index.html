@@ -2099,6 +2099,26 @@ function App() {
         preparedByEmail: currentUser?.email || '',
       });
     }
+
+    // Sync to Google Sheets
+    try {
+      const rawPrice = String(displayPrice).replace(/,/g,'');
+      await fetch('https://toomey-backend-production.up.railway.app/sync-to-sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobType:         'new_installation',
+          customerName:    name,
+          customerAddress: address || '',
+          customerPhone:   '',
+          customerEmail:   email || '',
+          preparedBy:      currentUser?.name || '',
+          grandTotal:      rawPrice,
+          notes,
+          pgp, mp, pro4, drip, zones,
+        })
+      });
+    } catch(e) { console.warn('Sheets sync failed (non-fatal):', e); }
   }
   
   async function sendToClient() {
