@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>W.L. Toomey — Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4f8; color: #1e293b; }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #0c1e3c 0%, #1a3a6b 60%, #2563eb 100%);
+      padding: 18px 24px; display: flex; align-items: center; gap: 14px;
+    }
+    .header img { width: 44px; height: 44px; border-radius: 10px; background: white; padding: 3px; object-fit: contain; }
+    .header-sub  { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.1em; }
+    .header-title{ font-size: 22px; font-weight: 700; color: white; }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      background: white; border-bottom: 1px solid #e2e8f0;
+      padding: 12px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .quick-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .quick-btns button {
+      padding: 6px 14px; border-radius: 20px; border: 1.5px solid #e2e8f0;
+      background: white; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .quick-btns button:hover  { border-color: #2563eb; color: #2563eb; }
+    .quick-btns button.active { background: #1a3a6b; border-color: #1a3a6b; color: white; }
+    .date-range { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+    .date-range input {
+      padding: 6px 10px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 13px; color: #1e293b;
+    }
+    .date-range span { font-size: 13px; color: #94a3b8; }
+    .date-range button {
+      padding: 6px 14px; border-radius: 8px; border: none;
+      background: #2563eb; color: white; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+
+    /* ── Content ── */
+    .content { max-width: 1300px; margin: 0 auto; padding: 24px 20px 60px; }
+    .section-title {
+      font-size: 16px; font-weight: 700; color: #1a3a6b;
+      margin: 28px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0;
+    }
+    .section-title:first-child { margin-top: 0; }
+
+    /* ── KPI Grid ── */
+    .kpi-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 4px;
+    }
+    .kpi-card {
+      background: white; border-radius: 14px; padding: 16px 18px;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.06); border: 1.5px solid #e2e8f0;
+    }
+    .kpi-label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
+    .kpi-value { font-size: 26px; font-weight: 800; line-height: 1; }
+    .kpi-sub   { font-size: 11px; color: #94a3b8; margin-top: 5px; }
+
+    /* ── Resolution bar ── */
+    .res-bar-wrap { margin: 10px 0 4px; }
+    .res-bar-track { background: #fce8e6; border-radius: 99px; height: 10px; overflow: hidden; }
+    .res-bar-fill  { background: #16a34a; height: 100%; border-radius: 99px; transition: width 0.4s; }
+    .res-bar-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+    /* ── Leaderboard ── */
+    .leaderboard { background: white; border-radius: 14px; overflow: hidden; border: 1.5px solid #e2e8f0; }
+    .lb-row { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #f1f5f9; }
+    .lb-row:last-child { border-bottom: none; }
+    .lb-row:nth-child(1) .lb-rank { background: #fbbf24; color: white; }
+    .lb-row:nth-child(2) .lb-rank { background: #94a3b8; color: white; }
+    .lb-row:nth-child(3) .lb-rank { background: #d97706; color: white; }
+    .lb-rank  { width: 28px; height: 28px; border-radius: 50%; background: #e2e8f0; color: #64748b; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .lb-name  { flex: 1; font-size: 15px; font-weight: 700; color: #1a3a6b; }
+    .lb-count { font-size: 13px; color: #64748b; margin-right: 8px; }
+    .lb-value { font-size: 15px; font-weight: 700; color: #16a34a; }
+
+    /* ── Kanban ── */
+    .kanban-header { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+    .kanban-title  { font-size: 16px; font-weight: 700; color: #1a3a6b; }
+    .kanban-hint   { font-size: 13px; color: #64748b; background: #f1f5f9; padding: 5px 12px; border-radius: 20px; }
+    .kanban-wrap   { overflow-x: auto; padding-bottom: 8px; }
+    .kanban        { display: flex; gap: 10px; min-width: max-content; }
+
+    .k-col { width: 200px; flex-shrink: 0; background: #f8fafc; border-radius: 12px; overflow: hidden; }
+    .k-col-header {
+      padding: 10px 12px; background: white; border-bottom: 1px solid #e2e8f0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .k-col-header.target-active { background: #eff6ff; }
+    .k-col-title  { font-size: 12px; font-weight: 700; }
+    .k-col-count  { font-size: 11px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 99px; font-weight: 700; }
+    .k-cards      { padding: 8px; display: flex; flex-direction: column; gap: 6px; min-height: 60px; }
+
+    .k-col.k-col-target .k-col-header { background: #eff6ff; }
+    .k-col.k-col-target { outline: 2px dashed #2563eb; cursor: pointer; }
+
+    .k-card {
+      background: white; border-radius: 10px; padding: 10px 12px;
+      border: 1.5px solid #e2e8f0; cursor: pointer; transition: all 0.15s;
+    }
+    .k-card:hover { border-color: #94a3b8; }
+    .k-card.k-card-selected { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); background: #eff6ff; }
+    .k-card-name  { font-size: 13px; font-weight: 700; color: #1a3a6b; margin-bottom: 3px; }
+    .k-card-addr  { font-size: 11px; color: #64748b; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .k-card-meta  { display: flex; justify-content: space-between; align-items: center; }
+    .k-card-value { font-size: 12px; font-weight: 700; color: #16a34a; }
+    .k-card-tech  { font-size: 11px; color: #94a3b8; }
+    .k-card-date  { font-size: 10px; color: #cbd5e1; margin-top: 4px; }
+
+    /* ── Misc ── */
+    .loading { text-align: center; padding: 60px; color: #64748b; font-size: 16px; }
+    .error   { text-align: center; padding: 40px; color: #dc2626; }
+    .empty   { text-align: center; padding: 20px; color: #94a3b8; font-size: 14px; }
+
+    @media (max-width: 600px) {
+      .date-range { display: none; }
+      .content { padding: 16px 12px 60px; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <img src="ToomeyLogo2026.png" alt="">
+  <div>
+    <div class="header-sub">W.L. Toomey Irrigation</div>
+    <div class="header-title">Dashboard</div>
+  </div>
+</div>
+
+<div class="filter-bar">
+  <div class="quick-btns">
+    <button onclick="applyPreset('today')">Today</button>
+    <button onclick="applyPreset('week')">Last 7 Days</button>
+    <button onclick="applyPreset('month')">This Month</button>
+    <button onclick="applyPreset('lastmonth')">Last Month</button>
+    <button onclick="applyPreset('year')">This Year</button>
+    <button onclick="applyPreset('all')">All Time</button>
+  </div>
+  <div class="date-range">
+    <input type="date" id="start-date" />
+    <span>to</span>
+    <input type="date" id="end-date" />
+    <button onclick="applyCustom()">Apply</button>
+  </div>
+</div>
+
+<div class="content">
+  <div id="content"><div class="loading">Loading dashboard...</div></div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzNihd63pA6DrwLyOzIDh4mWBba_hOLOjROwk54ZlFN_0CN0Rbm9wGUciMV-4KlVd5oQ/exec';
+
+const STAGES = ['Lead','Estimate Sent','Accepted','Scheduled','Completed','Post-Install Follow Up','Lost'];
+const STAGE_COLORS = {
+  'Lead':'#94a3b8','Estimate Sent':'#2563eb','Accepted':'#16a34a',
+  'Scheduled':'#0f766e','Completed':'#1a3a6b','Post-Install Follow Up':'#7c3aed','Lost':'#dc2626'
+};
+
+let selectedCard = null;
+
+window.addEventListener('DOMContentLoaded', function() { applyPreset('month'); });
+
+function toISO(d) { return d.toISOString().split('T')[0]; }
+
+function applyPreset(preset) {
+  document.querySelectorAll('.quick-btns button').forEach(b => b.classList.remove('active'));
+  var btns = document.querySelectorAll('.quick-btns button');
+  var idx  = ['today','week','month','lastmonth','year','all'].indexOf(preset);
+  if (idx >= 0 && btns[idx]) btns[idx].classList.add('active');
+
+  var now = new Date(), start = '', end = '';
+  if (preset === 'today') {
+    start = end = toISO(now);
+  } else if (preset === 'week') {
+    var s = new Date(now); s.setDate(now.getDate() - 6);
+    start = toISO(s); end = toISO(now);
+  } else if (preset === 'month') {
+    start = toISO(new Date(now.getFullYear(), now.getMonth(), 1)); end = toISO(now);
+  } else if (preset === 'lastmonth') {
+    start = toISO(new Date(now.getFullYear(), now.getMonth()-1, 1));
+    end   = toISO(new Date(now.getFullYear(), now.getMonth(), 0));
+  } else if (preset === 'year') {
+    start = toISO(new Date(now.getFullYear(), 0, 1)); end = toISO(now);
+  }
+  document.getElementById('start-date').value = start;
+  document.getElementById('end-date').value   = end;
+  loadData(start, end);
+}
+
+function applyCustom() {
+  document.querySelectorAll('.quick-btns button').forEach(b => b.classList.remove('active'));
+  loadData(document.getElementById('start-date').value, document.getElementById('end-date').value);
+}
+
+async function loadData(start, end) {
+  document.getElementById('content').innerHTML = '<div class="loading">Loading...</div>';
+  var url = APPS_SCRIPT_URL + '?action=get_dashboard';
+  if (start) url += '&start=' + start;
+  if (end)   url += '&end='   + end;
+  try {
+    var r = await fetch(url);
+    var data = await r.json();
+    if (data.error) throw new Error(data.error);
+    render(data);
+  } catch(e) {
+    document.getElementById('content').innerHTML = '<div class="error">Failed to load: ' + e.message + '</div>';
+  }
+}
+
+function fmt$(n)   { return '$' + Math.round(n || 0).toLocaleString(); }
+function fmtPct(n) { return (n || 0) + '%'; }
+
+function kpi(label, value, color, sub) {
+  return '<div class="kpi-card">'
+    + '<div class="kpi-label">' + label + '</div>'
+    + '<div class="kpi-value" style="color:' + color + '">' + value + '</div>'
+    + (sub ? '<div class="kpi-sub">' + sub + '</div>' : '')
+    + '</div>';
+}
+
+function render(d) {
+  var ni = d.newInstalls   || {};
+  var rv = d.revamp        || {};
+  var sc = d.serviceCalls  || {};
+  var sr = d.systemRecs    || {};
+  var ov = d.overall       || {};
+
+  var h = '';
+
+  // Overview
+  h += '<div class="section-title">Overview</div><div class="kpi-grid">';
+  h += kpi('Pipeline Value',   fmt$(ov.pipeline),        '#2563eb', 'Proposals sent, not yet accepted');
+  h += kpi('Revenue Secured',  fmt$(ov.secured),         '#16a34a', 'Accepted proposals');
+  h += kpi('Acceptance Rate',  fmtPct(ov.acceptanceRate),'#0f766e', 'Customers who accepted');
+  h += kpi('Total Proposals',  ov.totalProposals || 0,   '#1a3a6b', 'All types combined');
+  h += '</div>';
+
+  // New Installs KPIs
+  h += '<div class="section-title">🌱 New Installations</div><div class="kpi-grid">';
+  h += kpi('New Leads',       ni.count || 0,           '#1a3a6b');
+  h += kpi('Total Value',     fmt$(ni.total),           '#1a3a6b');
+  h += kpi('Close Rate',      fmtPct(ni.closeRate),     '#16a34a', 'Won ÷ (Won + Lost)');
+  h += kpi('Revenue Secured', fmt$(ni.secured),         '#16a34a');
+  h += kpi('Pipeline',        fmt$(ni.pipeline),        '#2563eb', 'Lead or Estimate Sent');
+  h += kpi('Avg Value',       fmt$(ni.avgValue),        '#475569');
+  h += kpi('Avg Heads',       ni.avgHeads || 0,         '#475569', 'Avg heads per install');
+  h += kpi('Lost',            ni.lost || 0,             '#dc2626');
+  h += '</div>';
+
+  // Kanban
+  h += renderKanban(ni.kanban || []);
+
+  // Re-Vamp
+  h += '<div class="section-title">🔧 Re-Vamp</div><div class="kpi-grid">';
+  h += kpi('Count',    rv.count || 0,       '#0284c7');
+  h += kpi('Value',    fmt$(rv.total),      '#0284c7');
+  h += kpi('Avg Value',fmt$(rv.avgValue),   '#475569');
+  h += kpi('Accepted', rv.accepted || 0,   '#16a34a');
+  h += '</div>';
+
+  // Service Calls
+  h += '<div class="section-title">🛠 Service Calls</div><div class="kpi-grid">';
+  h += kpi('Total',           sc.count || 0,              '#0f766e');
+  h += kpi('Resolved',        sc.resolved || 0,           '#16a34a');
+  h += kpi('Unresolved',      sc.unresolved || 0,         '#dc2626');
+  h += kpi('Resolution Rate', fmtPct(sc.resolutionRate),  '#0f766e');
+  h += '</div>';
+  if ((sc.count || 0) > 0) {
+    var pct = Math.round((sc.resolved || 0) / sc.count * 100);
+    h += '<div class="res-bar-wrap">'
+      + '<div class="res-bar-track"><div class="res-bar-fill" style="width:' + pct + '%"></div></div>'
+      + '<div class="res-bar-label">' + pct + '% of service calls resolved</div>'
+      + '</div>';
+  }
+
+  // System Recs
+  h += '<div class="section-title">💡 System Recommendations</div><div class="kpi-grid">';
+  h += kpi('Count',    sr.count || 0,       '#6d28d9');
+  h += kpi('Value',    fmt$(sr.total),      '#6d28d9');
+  h += kpi('Avg Value',fmt$(sr.avgValue),   '#475569');
+  h += kpi('Accepted', sr.accepted || 0,   '#16a34a');
+  h += '</div>';
+
+  // Leaderboard
+  h += '<div class="section-title">🏆 Leaderboard</div>';
+  h += renderLeaderboard(ov.leaderboard || []);
+
+  document.getElementById('content').innerHTML = h;
+  attachKanbanEvents();
+}
+
+function renderKanban(kanbanData) {
+  var grouped = {};
+  STAGES.forEach(function(s) { grouped[s] = []; });
+  kanbanData.forEach(function(c) {
+    var s = c.stage || 'Estimate Sent';
+    if (!grouped[s]) s = 'Estimate Sent';
+    grouped[s].push(c);
+  });
+
+  var h = '<div class="kanban-header">'
+    + '<div class="kanban-title">New Install Pipeline</div>'
+    + '<div class="kanban-hint" id="kanban-hint">Tap a card to select, then tap a column to move it</div>'
+    + '</div>'
+    + '<div class="kanban-wrap"><div class="kanban">';
+
+  STAGES.forEach(function(stage) {
+    var color = STAGE_COLORS[stage];
+    var cards = grouped[stage] || [];
+    h += '<div class="k-col" data-stage="' + stage + '">';
+    h += '<div class="k-col-header" style="border-top:3px solid ' + color + '">';
+    h += '<div class="k-col-title" style="color:' + color + '">' + stage + '</div>';
+    h += '<div class="k-col-count">' + cards.length + '</div>';
+    h += '</div><div class="k-cards">';
+    cards.forEach(function(card) {
+      h += '<div class="k-card" data-row="' + card.rowNum + '" data-stage="' + card.stage + '">';
+      h += '<div class="k-card-name">' + esc(card.customerName) + '</div>';
+      if (card.address) h += '<div class="k-card-addr">' + esc(card.address) + '</div>';
+      h += '<div class="k-card-meta">';
+      if (card.value) h += '<span class="k-card-value">$' + Math.round(card.value).toLocaleString() + '</span>';
+      if (card.preparedBy) h += '<span class="k-card-tech">' + esc(card.preparedBy.split(' ')[0]) + '</span>';
+      h += '</div>';
+      if (card.date) h += '<div class="k-card-date">' + esc(String(card.date).split(' ')[0]) + '</div>';
+      h += '</div>';
+    });
+    h += '</div></div>';
+  });
+
+  h += '</div></div>';
+  return h;
+}
+
+function attachKanbanEvents() {
+  selectedCard = null;
+  document.querySelectorAll('.k-card').forEach(function(card) {
+    card.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (selectedCard === card) {
+        card.classList.remove('k-card-selected');
+        selectedCard = null;
+        setHint('Tap a card to select, then tap a column to move it');
+        document.querySelectorAll('.k-col').forEach(c => c.classList.remove('k-col-target'));
+      } else {
+        if (selectedCard) selectedCard.classList.remove('k-card-selected');
+        card.classList.add('k-card-selected');
+        selectedCard = card;
+        setHint('"' + card.querySelector('.k-card-name').textContent + '" selected — tap a column to move it');
+        document.querySelectorAll('.k-col').forEach(c => c.classList.add('k-col-target'));
+      }
+    });
+  });
+
+  document.querySelectorAll('.k-col').forEach(function(col) {
+    col.addEventListener('click', function() {
+      if (!selectedCard) return;
+      var newStage = col.getAttribute('data-stage');
+      var rowNum   = parseInt(selectedCard.getAttribute('data-row'));
+      var name     = selectedCard.querySelector('.k-card-name').textContent;
+      moveCard(selectedCard, col, newStage, rowNum);
+      selectedCard.classList.remove('k-card-selected');
+      selectedCard = null;
+      document.querySelectorAll('.k-col').forEach(c => c.classList.remove('k-col-target'));
+      setHint('Moved "' + name + '" → ' + newStage);
+      setTimeout(function() { setHint('Tap a card to select, then tap a column to move it'); }, 3000);
+    });
+  });
+}
+
+function moveCard(cardEl, colEl, newStage, rowNum) {
+  var oldStage = cardEl.getAttribute('data-stage');
+  if (oldStage === newStage) return;
+  cardEl.setAttribute('data-stage', newStage);
+  var targetCards = colEl.querySelector('.k-cards');
+  if (targetCards) targetCards.appendChild(cardEl);
+  document.querySelectorAll('.k-col').forEach(function(col) {
+    col.querySelector('.k-col-count').textContent = col.querySelectorAll('.k-card').length;
+  });
+  fetch(APPS_SCRIPT_URL + '?action=update_stage&rowNum=' + rowNum + '&stage=' + encodeURIComponent(newStage))
+    .catch(function(e) { console.warn('Stage update failed:', e); });
+}
+
+function setHint(msg) {
+  var el = document.getElementById('kanban-hint');
+  if (el) el.textContent = msg;
+}
+
+function renderLeaderboard(lb) {
+  if (!lb.length) return '<div class="empty">No data for this period</div>';
+  var h = '<div class="leaderboard">';
+  lb.forEach(function(p, i) {
+    h += '<div class="lb-row">'
+      + '<div class="lb-rank">' + (i+1) + '</div>'
+      + '<div class="lb-name">' + esc(p.name) + '</div>'
+      + '<div class="lb-count">' + p.count + ' proposals</div>'
+      + '<div class="lb-value">$' + Math.round(p.value).toLocaleString() + '</div>'
+      + '</div>';
+  });
+  return h + '</div>';
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
