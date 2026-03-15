@@ -293,18 +293,29 @@
 <!-- Firebase -->
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import{getFirestore,collection,addDoc}from'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import{getFirestore,collection,addDoc,setDoc,getDoc,doc}from'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import{getStorage,ref as stRef,uploadString,getDownloadURL}from'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 const cfg={apiKey:"AIzaSyCQDkIKg33wi8LZlJmTiGXEUBw_xlbWYBI",authDomain:"toomey-estimator.firebaseapp.com",projectId:"toomey-estimator",storageBucket:"toomey-estimator.firebasestorage.app",messagingSenderId:"1062716214564",appId:"1:1062716214564:web:af169caa9c952ea65ab7b1"};
 const app=initializeApp(cfg);
 const db=getFirestore(app);
 const storage=getStorage(app);
 window.TFB={
-  async save(data){
+  async save(data,id){
     try{
+      if(id){
+        await setDoc(doc(db,'estimates',id),{...data,createdAt:new Date().toISOString()});
+        return id;
+      }
       const r=await addDoc(collection(db,'estimates'),{...data,createdAt:new Date().toISOString()});
       console.log('Saved:',r.id);return r.id;
     }catch(e){console.error('Firebase save failed:',e);return null;}
+  },
+  async getById(id){
+    try{
+      if(!id)return null;
+      const snap=await getDoc(doc(db,'estimates',id));
+      return snap.exists()?{id:snap.id,...snap.data()}:null;
+    }catch(e){console.error('Firebase getById failed:',e);return null;}
   },
   async uploadPhoto(dataUrl,path){
     try{
@@ -1410,7 +1421,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
           totals: { materials: matTotal, tax: taxTotal, labor: laborTotal, grand: grandTotal },
           preparedBy: currentUser?.name || '',
           preparedByEmail: currentUser?.email || '',
-        });
+        }, jobId);
       }
       // Sync to Google Sheets
       try {
@@ -1928,19 +1939,213 @@ function EstimatesQueueScreen({ onBack, onStartEstimate }) {
   );
 }
 
+// ── ProposalDetail ────────────────────────────────────────────────────────────
+function ProposalDetail({ summary, onBack }) {
+  const [full,    setFull]    = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const TYPE_ICONS = { 'New Installation':'🌱','Re-Vamp':'🔧','Service Call':'🛠','System Recommendations':'💡' };
+
+  useEffect(() => {
+    async function load() {
+      if (summary.firebaseId && window.TFB) {
+        const doc = await window.TFB.getById(summary.firebaseId);
+        setFull(doc);
+      }
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const statusColor = summary.status === 'Accepted to be Scheduled' ? {bg:'#dcfce7',fg:'#16a34a'} : {bg:'#f1f5f9',fg:'#64748b'};
+  const data = full || {};
+  const customer  = data.customer  || {};
+  const photos    = data.photos    || [];
+  const materials = data.materials || [];
+  const labor     = data.labor     || {};
+  const totals    = data.totals    || {};
+  const system    = data.system    || {};
+  const addOns    = data.addOns    || {};
+
+  return (
+    <div id="app-inner">
+      <div className="brand">
+        <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:8}} alt="" /></div>
+        <div style={{flex:1}}>
+          <div className="brand-sub">W.L. Toomey Irrigation</div>
+          <div className="brand-title">Proposal Detail</div>
+        </div>
+      </div>
+
+      <div className="card">
+        {/* Header */}
+        <div className="card-header" style={{padding:'20px 22px'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+            <div>
+              <div style={{fontSize:20,fontWeight:700,color:'white'}}>{summary.customerName}</div>
+              {summary.address && <div style={{fontSize:13,color:'rgba(255,255,255,0.75)',marginTop:3}}>{summary.address}</div>}
+            </div>
+            <div style={{textAlign:'right',flexShrink:0,marginLeft:12}}>
+              <div style={{fontSize:13,color:'rgba(255,255,255,0.9)',fontWeight:700}}>{TYPE_ICONS[summary.jobType]} {summary.jobType}</div>
+              <div style={{fontSize:12,color:'rgba(255,255,255,0.6)',marginTop:3}}>{summary.date}</div>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
+            <span style={{fontSize:12,fontWeight:700,padding:'4px 12px',borderRadius:20,background:statusColor.bg,color:statusColor.fg}}>{summary.status}</span>
+            {summary.preparedBy && <span style={{fontSize:12,padding:'4px 12px',borderRadius:20,background:'rgba(255,255,255,0.15)',color:'rgba(255,255,255,0.85)'}}>By {summary.preparedBy}</span>}
+          </div>
+        </div>
+
+        <div className="card-body">
+          {loading && <div style={{textAlign:'center',padding:40,color:'#64748b'}}>Loading full proposal...</div>}
+
+          {!loading && !full && (
+            <div style={{background:'#fffbeb',border:'1.5px solid #fde68a',borderRadius:10,padding:'12px 14px',marginBottom:16,fontSize:13,color:'#92400e'}}>
+              Full detail not available for proposals submitted before this feature was added. Showing summary data only.
+            </div>
+          )}
+
+          {/* Contact info */}
+          {(customer.phone || summary.phone || customer.email || summary.email) && (
+            <div style={{marginBottom:18}}>
+              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Contact</div>
+              {(customer.phone || summary.phone) && <div style={{fontSize:14,color:'#1e293b',marginBottom:4}}>📞 {customer.phone || summary.phone}</div>}
+              {(customer.email || summary.email) && <div style={{fontSize:14,color:'#1e293b'}}>✉️ {customer.email || summary.email}</div>}
+            </div>
+          )}
+
+          {/* Photos */}
+          {photos.length > 0 && (
+            <div style={{marginBottom:18}}>
+              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:10}}>Photos ({photos.length})</div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
+                {photos.map((p, i) => (
+                  <div key={i} style={{borderRadius:10,overflow:'hidden',background:'#f1f5f9'}}>
+                    <img src={p.url} alt={p.caption||`Photo ${i+1}`} style={{width:'100%',display:'block',objectFit:'cover',aspectRatio:'4/3'}} />
+                    {p.caption && <div style={{fontSize:11,color:'#64748b',padding:'4px 8px'}}>{p.caption}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          {(data.notes || summary.notes) && (
+            <div style={{marginBottom:18}}>
+              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Notes</div>
+              <div style={{background:'#f8fafc',borderRadius:10,padding:'12px 14px',fontSize:14,color:'#1e293b',lineHeight:1.65,border:'1.5px solid #e2e8f0'}}>
+                {data.notes || summary.notes}
+              </div>
+            </div>
+          )}
+
+          {/* Materials */}
+          {materials.length > 0 && (
+            <div style={{marginBottom:18}}>
+              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Materials</div>
+              <div style={{border:'1.5px solid #e2e8f0',borderRadius:10,overflow:'hidden'}}>
+                {materials.map((m, i) => (
+                  <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',borderBottom: i < materials.length-1 ? '1px solid #e2e8f0' : 'none',background: i%2===0 ? 'white' : '#f8fafc'}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,color:'#1e293b',fontWeight:600}}>{m.name}</div>
+                      <div style={{fontSize:12,color:'#64748b'}}>{m.qty} {m.unit} × ${Number(m.unitPrice).toLocaleString()}</div>
+                    </div>
+                    <div style={{fontSize:14,fontWeight:700,color:'#1a3a6b',flexShrink:0,marginLeft:12}}>${Number(m.total).toLocaleString()}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Labor */}
+          {labor.hours > 0 && (
+            <div style={{marginBottom:18}}>
+              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Labor</div>
+              <div style={{background:'#f8fafc',borderRadius:10,padding:'12px 14px',border:'1.5px solid #e2e8f0',display:'flex',justifyContent:'space-between'}}>
+                <div style={{fontSize:14,color:'#1e293b'}}>{labor.hours} hrs × ${labor.rate}/hr</div>
+                <div style={{fontSize:14,fontWeight:700,color:'#1a3a6b'}}>${Number(labor.total).toLocaleString()}</div>
+              </div>
+            </div>
+          )}
+
+          {/* New Install system info */}
+          {data.jobType === 'new_installation' && (system.pgp > 0 || system.mp > 0 || system.pro4 > 0 || system.drip > 0) && (
+            <div style={{marginBottom:18}}>
+              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>System Design</div>
+              <div style={{border:'1.5px solid #e2e8f0',borderRadius:10,overflow:'hidden'}}>
+                {[
+                  ['Hunter PGP-Ultra Rotary', system.pgp],
+                  ['Rotor Streamer (MP)', system.mp],
+                  ['Hunter Pro-4 Spray', system.pro4],
+                  ['Drip Zones', system.drip],
+                  ['# of Zones', system.zones],
+                  ['Valves', system.valves],
+                ].filter(([,v]) => v > 0).map(([label, val], i, arr) => (
+                  <div key={label} style={{display:'flex',justifyContent:'space-between',padding:'10px 14px',borderBottom: i < arr.length-1 ? '1px solid #e2e8f0' : 'none',background: i%2===0 ? 'white' : '#f8fafc'}}>
+                    <div style={{fontSize:14,color:'#1e293b'}}>{label}</div>
+                    <div style={{fontSize:14,fontWeight:700,color:'#1a3a6b'}}>{val}</div>
+                  </div>
+                ))}
+              </div>
+              {system.timer && <div style={{fontSize:13,color:'#64748b',marginTop:6}}>Timer: {system.timer}</div>}
+            </div>
+          )}
+
+          {/* Add-ons */}
+          {(addOns.sidewalk || addOns.other) && (
+            <div style={{marginBottom:18}}>
+              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Add-Ons</div>
+              {addOns.sidewalk && <div style={{fontSize:14,color:'#1e293b',marginBottom:4}}>Sidewalk Strip: {addOns.sidewalk}</div>}
+              {addOns.other    && <div style={{fontSize:14,color:'#1e293b'}}>Other: {addOns.other}</div>}
+            </div>
+          )}
+
+          {/* Totals */}
+          {(totals.grand || summary.total) && (
+            <div style={{background:'#1a3a6b',borderRadius:12,padding:'16px 18px'}}>
+              {totals.materials > 0 && (
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                  <div style={{fontSize:13,color:'rgba(255,255,255,0.7)'}}>Materials</div>
+                  <div style={{fontSize:13,color:'white'}}>${Number(totals.materials).toLocaleString()}</div>
+                </div>
+              )}
+              {totals.tax > 0 && (
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                  <div style={{fontSize:13,color:'rgba(255,255,255,0.7)'}}>Tax</div>
+                  <div style={{fontSize:13,color:'white'}}>${Number(totals.tax).toLocaleString()}</div>
+                </div>
+              )}
+              {totals.labor > 0 && (
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:10,paddingBottom:10,borderBottom:'1px solid rgba(255,255,255,0.2)'}}>
+                  <div style={{fontSize:13,color:'rgba(255,255,255,0.7)'}}>Labor</div>
+                  <div style={{fontSize:13,color:'white'}}>${Number(totals.labor).toLocaleString()}</div>
+                </div>
+              )}
+              <div style={{display:'flex',justifyContent:'space-between'}}>
+                <div style={{fontSize:16,fontWeight:700,color:'white'}}>Total</div>
+                <div style={{fontSize:18,fontWeight:700,color:'white'}}>${Number(totals.grand || summary.total || 0).toLocaleString()}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="nav-bar">
+        <button className="nav-btn-back" onClick={onBack}>← Back</button>
+      </div>
+    </div>
+  );
+}
+
 // ── PastProposalsScreen ───────────────────────────────────────────────────────
 function PastProposalsScreen({ onBack }) {
   const [query,    setQuery]    = useState('');
   const [results,  setResults]  = useState([]);
   const [loading,  setLoading]  = useState(false);
   const [searched, setSearched] = useState(false);
+  const [selected, setSelected] = useState(null);
 
-  const TYPE_ICONS = {
-    'New Installation': '🌱',
-    'Re-Vamp': '🔧',
-    'Service Call': '🛠',
-    'System Recommendations': '💡',
-  };
+  const TYPE_ICONS = { 'New Installation':'🌱','Re-Vamp':'🔧','Service Call':'🛠','System Recommendations':'💡' };
 
   async function search() {
     if (!query.trim()) return;
@@ -1957,6 +2162,10 @@ function PastProposalsScreen({ onBack }) {
   }
 
   function handleKey(e) { if (e.key === 'Enter') search(); }
+
+  if (selected) {
+    return <ProposalDetail summary={selected} onBack={() => setSelected(null)} />;
+  }
 
   return (
     <div id="app-inner">
@@ -1991,21 +2200,26 @@ function PastProposalsScreen({ onBack }) {
             </div>
           )}
           {results.map((r, i) => (
-            <div key={i} style={{background:'#f8fafc',borderRadius:14,padding:'14px 16px',marginBottom:10,border:'2px solid #e2e8f0'}}>
+            <div
+              key={i}
+              onClick={() => setSelected(r)}
+              style={{background:'#f8fafc',borderRadius:14,padding:'14px 16px',marginBottom:10,border:'2px solid #e2e8f0',cursor:'pointer',WebkitTapHighlightColor:'transparent'}}
+              onTouchStart={e=>{e.currentTarget.style.background='#eff6ff';e.currentTarget.style.borderColor='#2563eb';}}
+              onTouchEnd={e=>{e.currentTarget.style.background='#f8fafc';e.currentTarget.style.borderColor='#e2e8f0';}}
+            >
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
                 <div style={{fontSize:16,fontWeight:700,color:'#1a3a6b'}}>{r.customerName}</div>
                 <div style={{fontSize:13,color:'#0284c7',fontWeight:600,flexShrink:0,marginLeft:8}}>
                   {TYPE_ICONS[r.jobType] || ''} {r.jobType}
                 </div>
               </div>
-              {r.address  && <div style={{fontSize:13,color:'#64748b'}}>{r.address}</div>}
-              {r.phone    && <div style={{fontSize:13,color:'#64748b'}}>{r.phone}</div>}
+              {r.address && <div style={{fontSize:13,color:'#64748b'}}>{r.address}</div>}
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8,paddingTop:8,borderTop:'1px solid #e2e8f0'}}>
                 <div style={{fontSize:13,color:'#64748b'}}>{r.date}</div>
                 {r.total && r.total !== '0.00' && <div style={{fontSize:15,fontWeight:700,color:'#1a3a6b'}}>${Number(r.total).toLocaleString()}</div>}
-                <div style={{fontSize:12,padding:'3px 10px',borderRadius:20,background: r.status === 'Accepted to be Scheduled' ? '#dcfce7' : '#f1f5f9', color: r.status === 'Accepted to be Scheduled' ? '#16a34a' : '#64748b',fontWeight:600}}>{r.status}</div>
+                <div style={{fontSize:12,padding:'3px 10px',borderRadius:20,background: r.status==='Accepted to be Scheduled'?'#dcfce7':'#f1f5f9',color:r.status==='Accepted to be Scheduled'?'#16a34a':'#64748b',fontWeight:600}}>{r.status}</div>
               </div>
-              {r.notes && <div style={{fontSize:12,color:'#64748b',marginTop:6,fontStyle:'italic'}}>{r.notes}</div>}
+              <div style={{fontSize:12,color:'#94a3b8',marginTop:6,textAlign:'right'}}>Tap to view full proposal →</div>
             </div>
           ))}
         </div>
@@ -2230,7 +2444,8 @@ function App() {
   
   async function generate() {
     setLoading(true);
-    
+    const jobId = `install_${Date.now()}`;
+
     const estimateData = {
       customer_name: name,
       customer_address: address,
@@ -2291,7 +2506,7 @@ function App() {
         price: displayPrice,
         preparedBy: currentUser?.name || '',
         preparedByEmail: currentUser?.email || '',
-      });
+      }, jobId);
     }
 
     // Sync to Google Sheets
@@ -2302,6 +2517,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jobType:         'new_installation',
+          firebaseId:      jobId,
           customerName:    name,
           customerAddress: address || '',
           customerPhone:   '',
