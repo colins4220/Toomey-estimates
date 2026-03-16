@@ -359,6 +359,23 @@ const TIMER_OPTIONS = [
   "Other",
 ];
 
+const QUEUE_CACHE_KEY = 'toomey_queue_cache';
+
+function showToast(msg, type = 'success') {
+  let el = document.getElementById('app-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'app-toast';
+    el.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:99998;padding:13px 22px;border-radius:14px;font-family:system-ui,sans-serif;font-size:15px;font-weight:600;color:white;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:opacity 0.4s;pointer-events:none;white-space:nowrap;';
+    document.body.appendChild(el);
+  }
+  el.style.background = type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : '#1a3a6b';
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = '0'; }, 3500);
+}
+
 const TEAM_MEMBERS = [
   { name: "Bill Toomey", email: "bill@toomeyirrigation.com", title: "Founder, Co-Owner" },
   { name: "Jerry Toomey", email: "jerry@toomeyirrigation.com", title: "Co-Owner" },
@@ -1457,7 +1474,8 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
         });
         const sheetsResult = await sheetsResp.json();
         if (sheetsResult.acceptUrl) setAcceptUrl(sheetsResult.acceptUrl);
-      } catch(e) { console.warn('Sheets sync failed (non-fatal):', e); }
+        showToast('✅ Synced to Google Sheets');
+      } catch(e) { console.warn('Sheets sync failed:', e); showToast('⚠️ Sheet sync failed — check connection', 'error'); }
       if (queueRowIndex && onQueueComplete) { onQueueComplete(); }
     } catch(e) { console.error('Submit error:', e); }
     setSaving(false);
@@ -1886,16 +1904,44 @@ const JOB_TYPES = [
 
 // ── EstimatesQueueScreen ──────────────────────────────────────────────────────
 function EstimatesQueueScreen({ onBack, onStartEstimate }) {
+  const cached = (() => { try { return JSON.parse(localStorage.getItem(QUEUE_CACHE_KEY) || '{}'); } catch(e) { return {}; } })();
   const [loading, setLoading] = useState(true);
-  const [queue, setQueue]     = useState([]);
-  const [error, setError]     = useState(null);
+  const [queue,   setQueue]   = useState(cached.queue || []);
+  const [error,   setError]   = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(cached.ts || null);
 
-  useEffect(() => {
-    fetch(APPS_SCRIPT_URL + '?action=get_queue')
-      .then(r => r.json())
-      .then(data => { setQueue(data.queue || []); setLoading(false); })
-      .catch(() => { setError('Could not load queue. Check your connection.'); setLoading(false); });
-  }, []);
+  async function fetchQueue(attempt = 1) {
+    try {
+      const r = await fetch(APPS_SCRIPT_URL + '?action=get_queue&t=' + Date.now());
+      const data = await r.json();
+      const q = data.queue || [];
+      setQueue(q);
+      setError(null);
+      const ts = Date.now();
+      setLastUpdated(ts);
+      localStorage.setItem(QUEUE_CACHE_KEY, JSON.stringify({ queue: q, ts }));
+    } catch(e) {
+      if (attempt < 3) {
+        setTimeout(() => fetchQueue(attempt + 1), attempt * 2500);
+        return;
+      }
+      if (!cached.queue) setError('Could not load queue. Check your connection.');
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => { fetchQueue(); }, []);
+
+  function refresh() { setLoading(true); setError(null); fetchQueue(); }
+
+  function formatAge(ts) {
+    if (!ts) return '';
+    const mins = Math.round((Date.now() - ts) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins === 1) return '1 min ago';
+    if (mins < 60) return mins + ' mins ago';
+    return Math.round(mins / 60) + 'h ago';
+  }
 
   return (
     <div id="app-inner">
@@ -1905,8 +1951,15 @@ function EstimatesQueueScreen({ onBack, onStartEstimate }) {
       </div>
       <div className="card">
         <div className="card-header" style={{padding:'20px 22px'}}>
-          <div style={{fontSize:20,fontWeight:700,color:'white'}}>Upcoming Visits</div>
-          <div style={{fontSize:13,color:'rgba(255,255,255,0.7)',marginTop:4}}>Tap a visit to start an estimate</div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <div style={{fontSize:20,fontWeight:700,color:'white'}}>Upcoming Visits</div>
+            <button onClick={refresh} disabled={loading} style={{background:'rgba(255,255,255,0.15)',border:'none',borderRadius:8,color:'white',fontSize:13,fontWeight:600,padding:'6px 12px',cursor:'pointer'}}>
+              {loading ? '...' : '↻ Refresh'}
+            </button>
+          </div>
+          <div style={{fontSize:13,color:'rgba(255,255,255,0.7)',marginTop:4}}>
+            {lastUpdated ? 'Updated ' + formatAge(lastUpdated) : 'Tap a visit to start an estimate'}
+          </div>
         </div>
         <div className="card-body">
           {loading && <div style={{textAlign:'center',padding:40,color:'#64748b',fontSize:16}}>Loading...</div>}
@@ -2537,6 +2590,11 @@ function App() {
   const draft = loadDraft();
   const [currentUser, setCurrentUser] = useState(loadUser());
 
+  // Warm up Apps Script on load so first real request is fast
+  useEffect(() => {
+    fetch(APPS_SCRIPT_URL + '?action=get_queue&t=' + Date.now()).catch(() => {});
+  }, []);
+
   const [step, setStep]       = useState(0);
   const [done, setDone]       = useState(false);
   const [loading, setLoading] = useState(false);
@@ -2724,7 +2782,8 @@ function App() {
           addOnNotes: [sidewalk, other].filter(Boolean).join(' | '),
         })
       });
-    } catch(e) { console.warn('Sheets sync failed (non-fatal):', e); }
+      showToast('✅ Synced to Google Sheets');
+    } catch(e) { console.warn('Sheets sync failed:', e); showToast('⚠️ Sheet sync failed — check connection', 'error'); }
     if (queueRowIndex) {
       fetch(APPS_SCRIPT_URL + '?action=update_queue_status&row_index=' + queueRowIndex + '&status=Completed').catch(() => {});
       setQueueRowIndex(null);
