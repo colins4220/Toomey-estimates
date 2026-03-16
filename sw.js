@@ -1,7 +1,7 @@
-// W.L. Toomey Irrigation Estimator — Service Worker v5
+// W.L. Toomey Irrigation Estimator — Service Worker v6
 // Caches CDN libraries for speed/offline, but always fetches HTML fresh from network
 
-const CACHE_NAME = "toomey-estimator-v5";
+const CACHE_NAME = "toomey-estimator-v6";
 
 const CDN_ASSETS = [
   "https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js",
