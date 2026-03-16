@@ -2824,19 +2824,33 @@ function App() {
             {/* Preview & Send buttons */}
             {pdfId ? (
               <div style={{display:'flex',flexDirection:'column',gap:12}}>
-                <a
-                  href={`https://toomey-backend-production.up.railway.app/preview-pdf/${pdfId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display:'block',padding:'16px 20px',borderRadius:14,
-                    background:'linear-gradient(135deg,#1a3a6b,#2563eb)',
-                    color:'white',textAlign:'center',fontSize:17,fontWeight:700,
-                    textDecoration:'none',boxShadow:'0 4px 16px rgba(37,99,235,0.35)'
-                  }}
-                >
-                  📄 Preview PDF
-                </a>
+                <div style={{display:'flex',gap:10}}>
+                  <a
+                    href={`https://toomey-backend-production.up.railway.app/preview-pdf/${pdfId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      flex:1,display:'block',padding:'16px 10px',borderRadius:14,
+                      background:'linear-gradient(135deg,#1a3a6b,#2563eb)',
+                      color:'white',textAlign:'center',fontSize:16,fontWeight:700,
+                      textDecoration:'none',boxShadow:'0 4px 16px rgba(37,99,235,0.35)'
+                    }}
+                  >
+                    📄 Preview
+                  </a>
+                  <a
+                    href={`https://toomey-backend-production.up.railway.app/download-pdf/${pdfId}`}
+                    download
+                    style={{
+                      flex:1,display:'block',padding:'16px 10px',borderRadius:14,
+                      background:'linear-gradient(135deg,#166534,#16a34a)',
+                      color:'white',textAlign:'center',fontSize:16,fontWeight:700,
+                      textDecoration:'none',boxShadow:'0 4px 16px rgba(22,163,74,0.35)'
+                    }}
+                  >
+                    ⬇ Download
+                  </a>
+                </div>
                 
                 {email && (
                   <>
@@ -3241,11 +3255,47 @@ function App() {
 ReactDOM.createRoot(document.getElementById("app")).render(<App />);
 </script>
 
-<!-- Register service worker for offline support -->
+<!-- Register service worker + auto-update banner -->
 <script>
+  const APP_VERSION = "2026.03.16.1";
+
+  // Show update banner when a new service worker is waiting
+  function showUpdateBanner() {
+    if (document.getElementById('update-banner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'update-banner';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#1a3a6b;color:white;text-align:center;padding:14px 16px;font-family:system-ui,sans-serif;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,0.3);';
+    banner.innerHTML = '🔄 App update available — tap here to refresh';
+    banner.onclick = () => window.location.reload();
+    document.body.appendChild(banner);
+  }
+
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        // Check for updates every 5 minutes
+        setInterval(() => reg.update(), 5 * 60 * 1000);
+
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdateBanner();
+            }
+          });
+        });
+      }).catch(() => {});
+
+      // Also check version.json every 5 minutes as a fallback
+      function checkVersion() {
+        fetch('./version.json?t=' + Date.now())
+          .then(r => r.json())
+          .then(data => {
+            if (data.version && data.version !== APP_VERSION) showUpdateBanner();
+          }).catch(() => {});
+      }
+      setInterval(checkVersion, 5 * 60 * 1000);
+      setTimeout(checkVersion, 10000); // first check after 10s
     });
   }
 </script>
