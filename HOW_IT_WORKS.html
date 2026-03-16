@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>W.L. Toomey Irrigation — Estimator App Guide</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      background: #f0f4f8;
+      color: #1e293b;
+      padding: 32px 16px 80px;
+    }
+    .page { max-width: 900px; margin: 0 auto; }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #0c1e3c 0%, #1a3a6b 60%, #2563eb 100%);
+      border-radius: 20px;
+      padding: 44px 36px;
+      color: white;
+      margin-bottom: 36px;
+      text-align: center;
+    }
+    .header h1 { font-size: 30px; font-weight: 700; margin-bottom: 10px; }
+    .header p  { font-size: 15px; opacity: 0.82; line-height: 1.7; }
+    .header .url { margin-top: 16px; font-size: 13px; opacity: 0.6; }
+
+    /* ── TOC ── */
+    .toc {
+      background: white;
+      border-radius: 16px;
+      padding: 24px 28px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      margin-bottom: 36px;
+    }
+    .toc-title { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; }
+    .toc-links { display: flex; flex-wrap: wrap; gap: 10px; }
+    .toc-link {
+      padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700;
+      text-decoration: none; color: white;
+    }
+
+    /* ── Section headings ── */
+    h2 {
+      font-size: 21px; font-weight: 700; color: #1a3a6b;
+      margin: 44px 0 16px; padding-bottom: 10px;
+      border-bottom: 2px solid #cbd5e1;
+    }
+    h3 { font-size: 16px; font-weight: 700; color: #1e293b; margin: 24px 0 10px; }
+    h4 { font-size: 14px; font-weight: 700; color: #475569; margin: 16px 0 8px; }
+    p  { font-size: 14px; line-height: 1.8; color: #334155; margin-bottom: 12px; }
+
+    /* ── Workflow diagram ── */
+    .flow-wrap {
+      background: white; border-radius: 16px;
+      padding: 28px 20px; box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+      margin-bottom: 12px; overflow-x: auto;
+    }
+    .flow { display: flex; align-items: flex-start; gap: 0; min-width: 640px; }
+    .flow-step {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; text-align: center; position: relative;
+    }
+    .flow-step:not(:last-child)::after {
+      content: '→'; position: absolute; right: -14px; top: 20px;
+      font-size: 22px; color: #94a3b8; font-weight: 300;
+    }
+    .flow-bubble {
+      width: 48px; height: 48px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; margin-bottom: 8px; flex-shrink: 0;
+    }
+    .flow-label { font-size: 11px; font-weight: 700; color: #1a3a6b; line-height: 1.3; }
+    .flow-sub   { font-size: 10px; color: #64748b; margin-top: 3px; line-height: 1.3; }
+
+    /* ── Role cards ── */
+    .role-card {
+      background: white; border-radius: 20px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+      margin-bottom: 28px; overflow: hidden;
+    }
+    .role-header {
+      padding: 22px 28px; display: flex;
+      align-items: center; gap: 16px; color: white;
+    }
+    .role-icon {
+      width: 54px; height: 54px; border-radius: 16px;
+      background: rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; flex-shrink: 0;
+    }
+    .role-header h2 { font-size: 21px; margin: 0; border: none; padding: 0; color: white; }
+    .role-header p  { font-size: 13px; opacity: 0.85; margin: 4px 0 0; color: white; }
+    .role-body { padding: 24px 28px; }
+
+    .role-office    .role-header { background: linear-gradient(135deg, #0f766e, #14b8a6); }
+    .role-tech      .role-header { background: linear-gradient(135deg, #1a3a6b, #2563eb); }
+    .role-estimator .role-header { background: linear-gradient(135deg, #6d28d9, #8b5cf6); }
+
+    /* ── Step list ── */
+    .step-list { list-style: none; padding: 0; margin-bottom: 8px; }
+    .step-list li { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 16px; }
+    .step-num {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: #1a3a6b; color: white;
+      font-size: 13px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .step-num.green  { background: #0f766e; }
+    .step-num.purple { background: #6d28d9; }
+    .step-text { font-size: 14px; line-height: 1.75; color: #334155; }
+    .step-text strong { color: #1a3a6b; }
+
+    /* ── Tables ── */
+    .sheet-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 12px 0 16px; }
+    .sheet-table th { background: #1a3a6b; color: white; padding: 9px 14px; text-align: left; font-size: 13px; }
+    .sheet-table td { padding: 9px 14px; border-bottom: 1px solid #e2e8f0; color: #334155; line-height: 1.5; }
+    .sheet-table tr:last-child td { border-bottom: none; }
+    .sheet-table tr:nth-child(even) td { background: #f8fafc; }
+
+    /* ── Info / Warning / Note boxes ── */
+    .info-box {
+      background: #eff6ff; border: 1.5px solid #bfdbfe;
+      border-radius: 12px; padding: 14px 18px; margin: 14px 0;
+      font-size: 13px; color: #1e40af; line-height: 1.7;
+    }
+    .warn-box {
+      background: #fffbeb; border: 1.5px solid #fde68a;
+      border-radius: 12px; padding: 14px 18px; margin: 14px 0;
+      font-size: 13px; color: #92400e; line-height: 1.7;
+    }
+    .note-box {
+      background: #f0fdf4; border: 1.5px solid #86efac;
+      border-radius: 12px; padding: 14px 18px; margin: 14px 0;
+      font-size: 13px; color: #166534; line-height: 1.7;
+    }
+    .office-notes-box {
+      background: #fffbeb; border: 1.5px solid #fcd34d;
+      border-radius: 10px; padding: 12px 16px; margin: 10px 0;
+      font-size: 13px; color: #78350f; line-height: 1.7;
+    }
+    .office-notes-box .label {
+      font-size: 11px; font-weight: 700; color: #92400e;
+      text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
+    }
+
+    /* ── Job type chips ── */
+    .job-chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+    .chip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 16px; border-radius: 12px;
+      font-size: 13px; font-weight: 700; color: white;
+    }
+
+    /* ── Divider ── */
+    .divider { border: none; border-top: 1.5px solid #e2e8f0; margin: 24px 0; }
+
+    /* ── Screen mockup ── */
+    .screen-mock {
+      background: #1a3a6b; border-radius: 16px;
+      padding: 16px 18px; margin: 14px 0; color: white;
+      font-size: 13px; line-height: 1.7;
+    }
+    .screen-mock .screen-title { font-size: 16px; font-weight: 700; margin-bottom: 10px; opacity: 0.9; }
+    .screen-mock .screen-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .screen-mock .screen-item:last-child { border-bottom: none; }
+    .screen-mock .screen-icon { font-size: 20px; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>W.L. Toomey Irrigation — Estimator App</h1>
+    <p>Complete step-by-step guide for every member of the team.<br>
+    Office Staff &bull; Field Technicians &bull; Estimators</p>
+    <div class="url">App: colins4220.github.io/Toomey-estimates &nbsp;&bull;&nbsp; Google Sheet: Toomey Estimator Hub</div>
+  </div>
+
+  <!-- Table of Contents -->
+  <div class="toc">
+    <div class="toc-title">Jump to a section</div>
+    <div class="toc-links">
+      <a href="#how-it-works" class="toc-link" style="background:#475569;">How It All Works</a>
+      <a href="#job-types"    class="toc-link" style="background:#475569;">The 4 Job Types</a>
+      <a href="#office"       class="toc-link" style="background:#0f766e;">Office Staff</a>
+      <a href="#tech"         class="toc-link" style="background:#1a3a6b;">Field Technician</a>
+      <a href="#estimator"    class="toc-link" style="background:#6d28d9;">Estimator</a>
+      <a href="#sheet-guide"  class="toc-link" style="background:#475569;">Google Sheet Guide</a>
+      <a href="#dashboard"    class="toc-link" style="background:#0369a1;">Dashboard</a>
+      <a href="#troubleshoot" class="toc-link" style="background:#dc2626;">Troubleshooting</a>
+    </div>
+  </div>
+
+
+  <!-- ── How It All Works ── -->
+  <h2 id="how-it-works">How the Whole System Works</h2>
+  <p>Every estimate starts with a customer call and ends with a proposal in their inbox — all tracked automatically in one Google Sheet. Here is the full path from start to finish:</p>
+
+  <div class="flow-wrap">
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-bubble" style="background:#e0f2fe;">📞</div>
+        <div class="flow-label">Customer Calls</div>
+        <div class="flow-sub">Office takes the request</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-bubble" style="background:#dcfce7;">📋</div>
+        <div class="flow-label">Office Queues Visit</div>
+        <div class="flow-sub">Added to Google Sheet with notes &amp; job type</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-bubble" style="background:#ede9fe;">🚐</div>
+        <div class="flow-label">Tech Dispatched</div>
+        <div class="flow-sub">Opens app, sees visit with office notes</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-bubble" style="background:#fef9c3;">📱</div>
+        <div class="flow-label">Estimate Built</div>
+        <div class="flow-sub">Photos, materials, labor added on iPad</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-bubble" style="background:#fee2e2;">📄</div>
+        <div class="flow-label">Proposal Sent</div>
+        <div class="flow-sub">PDF emailed to customer from app</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-bubble" style="background:#d1fae5;">✅</div>
+        <div class="flow-label">Customer Accepts</div>
+        <div class="flow-sub">Clicks link — sheet updates automatically</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-bubble" style="background:#fce7f3;">📅</div>
+        <div class="flow-label">Job Scheduled</div>
+        <div class="flow-sub">Office books the work</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>The Google Sheet is the hub for everything.</strong> The app automatically sends every submitted proposal to the correct tab in the sheet — no manual copying. Office staff work entirely in the sheet. Field techs work entirely in the app. They stay in sync automatically.
+  </div>
+
+
+  <!-- ── The 4 Job Types ── -->
+  <h2 id="job-types">The Four Job Types</h2>
+  <p>Every estimate fits into one of four categories. Each one has its own tab in the Google Sheet and its own proposal format.</p>
+
+  <div class="job-chips">
+    <div class="chip" style="background:#166534;">🌱 New Installation</div>
+    <div class="chip" style="background:#92400e;">🔧 Re-Vamp</div>
+    <div class="chip" style="background:#1e40af;">🛠 Service Call</div>
+    <div class="chip" style="background:#6b21a8;">💡 System Recommendations</div>
+  </div>
+
+  <table class="sheet-table">
+    <tr><th>Job Type</th><th>When to use it</th><th>Who typically does it</th></tr>
+    <tr>
+      <td><strong>🌱 New Installation</strong></td>
+      <td>Customer wants a brand new irrigation system installed. Full design with head counts, zones, and drip.</td>
+      <td>Estimator</td>
+    </tr>
+    <tr>
+      <td><strong>🔧 Re-Vamp</strong></td>
+      <td>Larger-scope upgrade to an existing system. Requires equipment or machine work.</td>
+      <td>Field Tech or Estimator</td>
+    </tr>
+    <tr>
+      <td><strong>🛠 Service Call</strong></td>
+      <td>Repair or urgent work that needs to be done. May include materials, labor, and tax.</td>
+      <td>Field Tech</td>
+    </tr>
+    <tr>
+      <td><strong>💡 System Recommendations</strong></td>
+      <td>Upgrades or fixes the tech spots while on a job — things the customer didn't ask for but should know about.</td>
+      <td>Field Tech</td>
+    </tr>
+  </table>
+
+  <div class="note-box">
+    <strong>System Recommendations tip:</strong> These are great for uncovering revenue the customer doesn't know they need. If you see blocked heads, a WiFi controller upgrade opportunity, or worn solenoids — log it right there in the app. It takes 2 minutes and sends the customer a professional proposal automatically.
+  </div>
+
+
+  <!-- ── OFFICE STAFF ── -->
+  <div class="role-card role-office" id="office">
+    <div class="role-header">
+      <div class="role-icon">🏢</div>
+      <div>
+        <h2>Office Staff</h2>
+        <p>Scheduling visits, tracking proposals, and monitoring job status</p>
+      </div>
+    </div>
+    <div class="role-body">
+
+      <h3>Part 1 — Adding a Visit to the Estimates Queue</h3>
+      <p>When a customer calls to schedule an estimate or service visit, you add a row to the <strong>Estimates Queue</strong> tab in the Google Sheet. The field tech will see it automatically in the app — no need to call or text them separately.</p>
+
+      <ul class="step-list">
+        <li>
+          <div class="step-num green">1</div>
+          <div class="step-text">Open the <strong>Toomey Estimator Hub</strong> Google Sheet. You can find it in your Google Drive or bookmark it in your browser.</div>
+        </li>
+        <li>
+          <div class="step-num green">2</div>
+          <div class="step-text">Click the <strong>Estimates Queue</strong> tab at the bottom of the sheet.</div>
+        </li>
+        <li>
+          <div class="step-num green">3</div>
+          <div class="step-text">Click on the first empty row below the last entry. Fill in each column left to right:</div>
+        </li>
+      </ul>
+
+      <table class="sheet-table">
+        <tr><th>Column</th><th>What to enter</th><th>Required?</th></tr>
+        <tr><td>Customer Name</td><td>Full name of the customer</td><td>Yes</td></tr>
+        <tr><td>Address</td><td>Full service address</td><td>Yes</td></tr>
+        <tr><td>Phone</td><td>Best contact number</td><td>Yes</td></tr>
+        <tr><td>Email</td><td>Customer email — needed to send them the proposal</td><td>Yes</td></tr>
+        <tr><td>Scheduled Date</td><td>Date of the visit (e.g. 6/12/2026)</td><td>Yes</td></tr>
+        <tr><td>Job Description</td><td>Brief description of what the visit is for (e.g. "Check zone 3, possible head damage")</td><td>Recommended</td></tr>
+        <tr><td>Assigned To</td><td>Name of the tech going out</td><td>Recommended</td></tr>
+        <tr><td>Status</td><td>Leave as <strong>Scheduled</strong> when adding. Will auto-update to <strong>Completed</strong> when tech submits proposal.</td><td>Yes</td></tr>
+        <tr><td>Notes</td><td><strong>Internal notes for the tech.</strong> What did the customer tell you? What are they hoping for? What should the tech look for on site? These notes appear in the app but do NOT go on the proposal sent to the customer.</td><td>Recommended</td></tr>
+        <tr><td>Job Type</td><td>Select from the dropdown: <strong>New Install, Re-Vamp, Service Call, or System Recommendations.</strong> This tells the app which form to open automatically — the tech skips the selection step entirely.</td><td>Strongly recommended</td></tr>
+      </table>
+
+      <div class="office-notes-box">
+        <div class="label">How the tech sees your notes</div>
+        When the tech opens the Estimates Queue in the app, your notes show up in a highlighted yellow box on their screen labeled "Office Notes (Internal)." They read it before tapping Start Estimate. The notes are only for the tech — they never appear on the PDF sent to the customer.
+      </div>
+
+      <div class="warn-box">
+        <strong>Do not leave the Job Type column blank if you know what the visit is for.</strong> If it is blank, the tech will still need to manually pick the job type themselves in the app. Filling it in saves them a step and makes sure the estimate goes to the right sheet tab automatically.
+      </div>
+
+      <hr class="divider">
+
+      <h3>Part 2 — Monitoring Proposals in the Sheet</h3>
+      <p>Once a tech submits an estimate from the app, it automatically appears in the correct tab of the Google Sheet. You do not need to do anything — it's just there.</p>
+
+      <p>Here is what each column means:</p>
+
+      <table class="sheet-table">
+        <tr><th>Column</th><th>What it means</th></tr>
+        <tr><td>Firebase ID</td><td>A unique ID number. You can ignore this — it's used by the system.</td></tr>
+        <tr><td>Customer Name / Address / Phone / Email</td><td>Customer contact info pulled from the estimate</td></tr>
+        <tr><td>Prepared By</td><td>Which tech or estimator submitted it</td></tr>
+        <tr><td>Date</td><td>The date the estimate was submitted</td></tr>
+        <tr><td>Total / Grand Total</td><td>The proposal price</td></tr>
+        <tr><td>Notes</td><td>Notes the tech entered on site (these DO appear on the proposal)</td></tr>
+        <tr><td>Status</td><td>Current status — see below</td></tr>
+      </table>
+
+      <h4>Status Values</h4>
+      <table class="sheet-table">
+        <tr><th>Status</th><th>What it means</th></tr>
+        <tr><td>Pending / Sent</td><td>The proposal has been submitted and emailed to the customer. Waiting on their response.</td></tr>
+        <tr><td>Accepted</td><td>The customer clicked the Accept link in their email. You should now schedule the job.</td></tr>
+        <tr><td>Declined</td><td>You can manually set this if the customer said no. Select from the dropdown in the Status column.</td></tr>
+      </table>
+
+      <hr class="divider">
+
+      <h3>Part 3 — When a Customer Accepts a Proposal</h3>
+      <ul class="step-list">
+        <li>
+          <div class="step-num green">1</div>
+          <div class="step-text">The customer receives an email with the proposal PDF attached and a button that says <strong>Accept This Proposal.</strong></div>
+        </li>
+        <li>
+          <div class="step-num green">2</div>
+          <div class="step-text">When they click the Accept button, the <strong>Status column in the sheet automatically updates to "Accepted."</strong> You do not need to do anything — it happens on its own within seconds.</div>
+        </li>
+        <li>
+          <div class="step-num green">3</div>
+          <div class="step-text">Check the sheet regularly and sort by Status to find all proposals marked Accepted that are waiting to be scheduled. Reach out to the customer to book the job.</div>
+        </li>
+      </ul>
+
+      <div class="info-box">
+        <strong>For New Installations:</strong> The New Installs tab also has a <strong>Stage</strong> column with a dropdown. Once a customer accepts, the Stage updates automatically to "Accepted." You can then manually advance it through: <strong>Scheduled → Completed → Post-Install Follow Up</strong> as the job progresses. This feeds the Kanban board in the Dashboard.
+      </div>
+
+      <hr class="divider">
+
+      <h3>Part 4 — Tracking Service Calls (Resolved / Unresolved)</h3>
+      <p>The Service Calls tab has a special <strong>Resolved</strong> column (the last column). Every service call starts as <strong>Unresolved</strong> (highlighted red) automatically.</p>
+
+      <ul class="step-list">
+        <li>
+          <div class="step-num green">1</div>
+          <div class="step-text">When a service call job is completed and closed out, find the row in the <strong>Service Calls</strong> tab.</div>
+        </li>
+        <li>
+          <div class="step-num green">2</div>
+          <div class="step-text">Click on the cell in the <strong>Resolved</strong> column for that row. A dropdown will appear with two options: <strong>Unresolved</strong> and <strong>Resolved.</strong></div>
+        </li>
+        <li>
+          <div class="step-num green">3</div>
+          <div class="step-text">Select <strong>Resolved.</strong> The entire row will turn <strong>green</strong> automatically.</div>
+        </li>
+      </ul>
+
+      <div class="note-box">
+        <strong>You can also add service calls manually.</strong> If a service call comes in and never goes through the app (for example, a walk-in or a verbal job that gets handled on the spot), you can type a row directly into the Service Calls tab. Just leave the Firebase ID, Accept Token, and Accept URL columns blank. Everything else works the same — it will show up in the Dashboard and leaderboard just like any other entry.
+      </div>
+
+      <hr class="divider">
+
+      <h3>Part 5 — The Dashboard</h3>
+      <p>The Dashboard gives you a live overview of the business. You can access it in two ways: tap <strong>Dashboard</strong> in the app, or open <strong>dashboard.html</strong> in a browser.</p>
+
+      <p>At the top, you can filter by date range. Use the quick buttons (Today, Last 7 Days, This Month, etc.) or enter a custom date range. Everything on the page updates to match the filter.</p>
+
+      <table class="sheet-table">
+        <tr><th>Dashboard Section</th><th>What it shows</th></tr>
+        <tr><td>Overview KPIs</td><td>Total proposals submitted, total dollar value of all proposals, and total dollar value of accepted proposals across all job types</td></tr>
+        <tr><td>New Installs</td><td>Count and total value of new install proposals, plus close rate (how many were accepted vs. total leads)</td></tr>
+        <tr><td>Re-Vamp</td><td>Count and total value of re-vamp proposals</td></tr>
+        <tr><td>Service Calls</td><td>Total count, plus how many are Resolved vs. Unresolved</td></tr>
+        <tr><td>System Recommendations</td><td>Count and total value</td></tr>
+        <tr><td>Leaderboard</td><td>Each team member ranked by total proposal value submitted</td></tr>
+        <tr><td>Kanban Board (New Installs)</td><td>All new install leads organized by stage — Lead, Estimate Sent, Accepted, Scheduled, Completed, Post-Install Follow Up, Lost. Tap any card and then tap a column to move it to a new stage.</td></tr>
+      </table>
+
+    </div>
+  </div>
+
+
+  <!-- ── FIELD TECH ── -->
+  <div class="role-card role-tech" id="tech">
+    <div class="role-header">
+      <div class="role-icon">🚐</div>
+      <div>
+        <h2>Field Technician</h2>
+        <p>Estimates Queue, on-site proposals, service calls, and system recommendations</p>
+      </div>
+    </div>
+    <div class="role-body">
+
+      <h3>Part 1 — Setting Up the App (First Time Only)</h3>
+      <ul class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-text">On your iPad, open <strong>Safari</strong> and go to: <strong>colins4220.github.io/Toomey-estimates</strong></div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-text">To add it to your home screen so it works like a regular app: tap the <strong>Share button</strong> (the box with an arrow pointing up) at the bottom of Safari, then tap <strong>Add to Home Screen,</strong> then tap <strong>Add.</strong> The Toomey icon will appear on your home screen.</div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-text">The first time you open the app, it will ask you to select your name. Tap your name from the list.</div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-text">It will ask for your <strong>email password.</strong> This is your Toomey email password (the same one you use to log into your email). The app uses it to send proposals from your email address. <em>You only enter this once — the app remembers it.</em></div>
+        </li>
+        <li>
+          <div class="step-num">5</div>
+          <div class="step-text">You are in. From now on, just open the app from your home screen icon and it will know who you are automatically.</div>
+        </li>
+      </ul>
+
+      <div class="info-box">
+        <strong>Need to switch users?</strong> Tap your first name in the top-right corner of the app. A confirmation will appear. Tap yes to switch to a different user. This is useful if more than one tech shares an iPad.
+      </div>
+
+      <hr class="divider">
+
+      <h3>Part 2 — Checking Your Estimates Queue</h3>
+      <p>The office schedules all upcoming visits in the <strong>Estimates Queue.</strong> This is your to-do list for the day. Always check it first.</p>
+
+      <ul class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-text">On the home screen, tap <strong>Estimates Queue.</strong></div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-text">You will see a list of all scheduled visits. Each card shows the customer name, address, phone number, scheduled date, and job description.</div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-text">If the office left notes, you will see a <strong>yellow box labeled "Office Notes (Internal)"</strong> on the card. These are internal notes from the office about what the customer is looking for or what to check on site. Read these before arriving. <strong>They do not appear on the proposal you send to the customer.</strong></div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-text">When you are ready to start an estimate for a visit, tap the <strong>Start [Job Type] →</strong> button on that card. If the office set a job type, the app will automatically open the right form with the customer's info already filled in. If no job type was set, you will be taken to the home screen to pick one.</div>
+        </li>
+      </ul>
+
+      <div class="office-notes-box">
+        <div class="label">Example of what you will see</div>
+        <em>"Customer says zone 4 has low pressure. Also noticed a broken head near the driveway last fall. Check backflow preventer as well. They are interested in upgrading the controller to WiFi if price is reasonable."</em>
+      </div>
+
+      <hr class="divider">
+
+      <h3>Part 3 — Building a Service Call, Re-Vamp, or System Recommendation Estimate</h3>
+      <p>These three job types all use the same form in the app. Here is how to fill it out step by step.</p>
+
+      <ul class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-text"><strong>Customer Info:</strong> If you started from the Estimates Queue, the customer name, address, phone, and email are already filled in. If not, you will be asked to enter them. Make sure the email is correct — this is where the proposal will be sent.</div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-text"><strong>Photos:</strong> Tap <strong>Add Photo</strong> to attach photos of the site, problem area, or work completed. You can add multiple photos. These appear in the proposal PDF.</div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-text"><strong>Materials:</strong> Type in the search box to find a part or material. Tap it to add it to the list. Use the <strong>+</strong> and <strong>−</strong> buttons to set the quantity. The price is calculated automatically. To remove an item, tap the <strong>✕</strong> next to it.</div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-text"><strong>Labor:</strong> Enter the number of hours and confirm the hourly rate. The labor total is calculated automatically.</div>
+        </li>
+        <li>
+          <div class="step-num">5</div>
+          <div class="step-text"><strong>Notes:</strong> Enter any notes about the work — what you found, what you did, or what you recommend. <strong>These notes DO appear on the proposal the customer receives,</strong> so write them in a customer-friendly way.</div>
+        </li>
+        <li>
+          <div class="step-num">6</div>
+          <div class="step-text">Review the total at the bottom. When everything looks right, tap <strong>Submit Job.</strong> The estimate is saved to Firebase and synced to the Google Sheet automatically.</div>
+        </li>
+        <li>
+          <div class="step-num">7</div>
+          <div class="step-text">After submitting, tap <strong>Preview PDF</strong> to see the proposal before sending. If it looks right, enter the customer's email address (it may be pre-filled), add an optional personal message, and tap <strong>Send to Customer.</strong></div>
+        </li>
+        <li>
+          <div class="step-num">8</div>
+          <div class="step-text">The proposal is emailed to the customer from <em>your</em> Toomey email address. It includes the PDF and an <strong>Accept This Proposal</strong> button. When the customer clicks it, the status in the Google Sheet updates automatically.</div>
+        </li>
+      </ul>
+
+      <div class="warn-box">
+        <strong>Always tap Submit before sending.</strong> The Submit button saves the job to the records first. The Send button only sends the email. If you only send without submitting, the job will not appear in the Google Sheet.
+      </div>
+
+      <hr class="divider">
+
+      <h3>Part 4 — Looking Up a Past Proposal</h3>
+      <p>If a customer calls and asks about a proposal from earlier in the season — or you need to reference something from a past visit — you can look it up right in the app.</p>
+
+      <ul class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-text">On the home screen, tap <strong>Past Proposals.</strong></div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-text">Type the customer's name, address, or any other detail in the search box and tap <strong>Search.</strong></div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-text">A list of matching proposals will appear, showing the job type, date, and total.</div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-text">Tap any result to open the <strong>full proposal detail</strong> — including all photos, materials, labor, notes, and totals, exactly as they were submitted.</div>
+        </li>
+      </ul>
+
+    </div>
+  </div>
+
+
+  <!-- ── ESTIMATOR ── -->
+  <div class="role-card role-estimator" id="estimator">
+    <div class="role-header">
+      <div class="role-icon">📐</div>
+      <div>
+        <h2>Estimator — New Installations</h2>
+        <p>Full irrigation system design and pricing</p>
+      </div>
+    </div>
+    <div class="role-body">
+
+      <h3>Overview</h3>
+      <p>The New Installation flow is a dedicated multi-step process built specifically for designing and pricing a new irrigation system. It is separate from the other job types and has its own pricing logic built in.</p>
+
+      <hr class="divider">
+
+      <h3>Step-by-Step: Building a New Installation Estimate</h3>
+
+      <h4>Getting Started</h4>
+      <ul class="step-list">
+        <li>
+          <div class="step-num purple">1</div>
+          <div class="step-text">Check the <strong>Estimates Queue</strong> first. If the office queued this visit and set the job type to "New Install," the app will open the New Installation form automatically when you tap Start Estimate. Customer info will be pre-filled.</div>
+        </li>
+        <li>
+          <div class="step-num purple">2</div>
+          <div class="step-text">If you are not starting from the queue, tap <strong>New Installation</strong> on the home screen.</div>
+        </li>
+      </ul>
+
+      <h4>Step 1 — Customer Information</h4>
+      <ul class="step-list">
+        <li>
+          <div class="step-num purple">3</div>
+          <div class="step-text">Enter the customer's <strong>full name.</strong></div>
+        </li>
+        <li>
+          <div class="step-num purple">4</div>
+          <div class="step-text">Enter the <strong>service address.</strong> As you type, address suggestions will appear below the box — tap the correct one to select it. This auto-fills the full address.</div>
+        </li>
+        <li>
+          <div class="step-num purple">5</div>
+          <div class="step-text">Enter the customer's <strong>email address.</strong> Double-check this — it is where the proposal PDF will be sent.</div>
+        </li>
+        <li>
+          <div class="step-num purple">6</div>
+          <div class="step-text">Tap <strong>Next →</strong></div>
+        </li>
+      </ul>
+
+      <h4>Step 2 — System Design</h4>
+      <ul class="step-list">
+        <li>
+          <div class="step-num purple">7</div>
+          <div class="step-text">Use the <strong>+</strong> and <strong>−</strong> buttons to enter the head counts for each type:</div>
+        </li>
+      </ul>
+
+      <table class="sheet-table">
+        <tr><th>Head Type</th><th>What it is</th></tr>
+        <tr><td>Hunter PGP-Ultra Rotary</td><td>Standard rotary head — most common for lawns</td></tr>
+        <tr><td>Rotor Streamer (MP Nozzle)</td><td>Multi-stream rotary nozzle for tighter areas</td></tr>
+        <tr><td>Hunter Pro-4 Spray</td><td>Fixed spray head — used in beds and narrow strips</td></tr>
+        <tr><td>Drip Zones</td><td>Number of drip irrigation zones</td></tr>
+        <tr><td>Number of Zones</td><td>Total number of irrigation zones / valve stations</td></tr>
+      </table>
+
+      <ul class="step-list">
+        <li>
+          <div class="step-num purple">8</div>
+          <div class="step-text"><strong>Pricing is calculated automatically</strong> based on the total head count:
+            <ul style="margin-top:8px; font-size:13px; line-height:1.8; color:#334155;">
+              <li>1–15 heads: $2,650 base price</li>
+              <li>16–30 heads: $3,635 base price</li>
+              <li>31+ heads: $125 per head</li>
+              <li>Each drip zone adds $1,000</li>
+            </ul>
+            You can override the price manually if needed by tapping on the price field and typing a new number.
+          </div>
+        </li>
+        <li>
+          <div class="step-num purple">9</div>
+          <div class="step-text">Tap <strong>Next →</strong></div>
+        </li>
+      </ul>
+
+      <h4>Step 3 — Add-Ons</h4>
+      <ul class="step-list">
+        <li>
+          <div class="step-num purple">10</div>
+          <div class="step-text">If there are any additional items to add (sidewalk strip work, specialty items, etc.), enter a description and a price. You can add as many as needed. If there are no add-ons, just tap <strong>Next →</strong> to skip.</div>
+        </li>
+      </ul>
+
+      <h4>Step 4 — Review and Generate</h4>
+      <ul class="step-list">
+        <li>
+          <div class="step-num purple">11</div>
+          <div class="step-text">Review the full summary — customer info, all head counts, add-ons, and the final total. Make sure everything is correct.</div>
+        </li>
+        <li>
+          <div class="step-num purple">12</div>
+          <div class="step-text">Add any <strong>Notes</strong> if needed. These will appear on the proposal.</div>
+        </li>
+        <li>
+          <div class="step-num purple">13</div>
+          <div class="step-text">Tap <strong>Generate Proposal.</strong> The PDF is created and the proposal is saved to the <strong>New Installs</strong> tab in Google Sheets automatically. The Stage will be set to <strong>"Estimate Sent"</strong> in the sheet.</div>
+        </li>
+        <li>
+          <div class="step-num purple">14</div>
+          <div class="step-text">Tap <strong>Preview PDF</strong> to review it before sending.</div>
+        </li>
+        <li>
+          <div class="step-num purple">15</div>
+          <div class="step-text">When it looks right, tap <strong>Send to Customer.</strong> The proposal is emailed to the customer with the PDF attached and an <strong>Accept This Proposal</strong> button.</div>
+        </li>
+      </ul>
+
+      <div class="info-box">
+        <strong>When the customer accepts:</strong> The Status in the sheet updates to "Accepted" and the Stage on the Kanban board moves to "Accepted" automatically. The office will see this and schedule the installation.
+      </div>
+
+      <hr class="divider">
+
+      <h3>What Gets Recorded in the Google Sheet</h3>
+      <p>The New Installs tab captures full system design detail for every proposal:</p>
+
+      <table class="sheet-table">
+        <tr><th>Column</th><th>What it captures</th></tr>
+        <tr><td>Customer Name / Address / Phone / Email</td><td>Customer contact information</td></tr>
+        <tr><td>Prepared By</td><td>Your name</td></tr>
+        <tr><td>Date</td><td>Date the proposal was submitted</td></tr>
+        <tr><td>Total Price</td><td>The final proposal price</td></tr>
+        <tr><td>PGP Rotary Heads</td><td>Number of Hunter PGP-Ultra heads</td></tr>
+        <tr><td>Rotor Streamers</td><td>Number of MP Nozzle / Rotor Streamers</td></tr>
+        <tr><td>Pro-4 Spray Heads</td><td>Number of Hunter Pro-4 Spray heads</td></tr>
+        <tr><td>Drip Zones</td><td>Number of drip irrigation zones</td></tr>
+        <tr><td># of Zones</td><td>Total number of zones / valve stations</td></tr>
+        <tr><td>Notes</td><td>Any notes entered during the estimate</td></tr>
+        <tr><td>Status</td><td>Pending / Accepted / Declined</td></tr>
+        <tr><td>Stage</td><td>Where the job is in the pipeline (Estimate Sent → Accepted → Scheduled → Completed, etc.)</td></tr>
+      </table>
+
+    </div>
+  </div>
+
+
+  <!-- ── Google Sheet Guide ── -->
+  <h2 id="sheet-guide">The Google Sheet — Tab by Tab</h2>
+  <p>The <strong>Toomey Estimator Hub</strong> Google Sheet has five tabs. Here is what each one is for:</p>
+
+  <table class="sheet-table">
+    <tr><th>Tab</th><th>Who fills it</th><th>Purpose</th></tr>
+    <tr>
+      <td>📋 Estimates Queue</td>
+      <td>Office (manually)</td>
+      <td>Upcoming visits for techs. Add a row for every visit you schedule. The tech sees it in the app. Status auto-updates to "Completed" when they submit a proposal.</td>
+    </tr>
+    <tr>
+      <td>🌱 New Installs</td>
+      <td>App (automatic)</td>
+      <td>All New Installation proposals. Includes full head counts, drip zones, and a Stage column for the Kanban board.</td>
+    </tr>
+    <tr>
+      <td>🔧 Re-Vamp</td>
+      <td>App (automatic)</td>
+      <td>All Re-Vamp proposals with materials, labor, and totals.</td>
+    </tr>
+    <tr>
+      <td>🛠 Service Calls</td>
+      <td>App (automatic) + Manual entries OK</td>
+      <td>All service call proposals. Includes a Resolved/Unresolved column. Rows will be red when unresolved and turn green when you mark them resolved.</td>
+    </tr>
+    <tr>
+      <td>💡 System Recommendations</td>
+      <td>App (automatic)</td>
+      <td>All System Recommendation proposals submitted from the app.</td>
+    </tr>
+  </table>
+
+  <div class="warn-box">
+    <strong>Never delete rows from the proposal tabs (New Installs, Re-Vamp, Service Calls, System Recs).</strong> These are permanent records. If a job was cancelled or a proposal was a mistake, change the Status to "Declined" instead of deleting the row.
+  </div>
+
+
+  <!-- ── Dashboard ── -->
+  <h2 id="dashboard">The Dashboard</h2>
+  <p>The Dashboard gives you a live picture of how the business is performing. It reads directly from the Google Sheet so it is always up to date.</p>
+
+  <h3>How to Access It</h3>
+  <ul>
+    <li><strong>In the app:</strong> Tap <strong>Dashboard</strong> on the home screen.</li>
+    <li><strong>In a browser:</strong> Open <strong>dashboard.html</strong> from the ToomeyEstimator folder.</li>
+  </ul>
+
+  <h3>Using the Date Filter</h3>
+  <p>At the top of the dashboard you will see date filter buttons: <strong>Today, Last 7 Days, This Month, Last Month, This Year, All Time.</strong> Tap any of them and the entire dashboard updates immediately to show only data from that time period. You can also tap <strong>Custom</strong> and enter your own start and end dates.</p>
+
+  <h3>The Kanban Board (New Installs Pipeline)</h3>
+  <p>The bottom section of the dashboard shows all New Install leads organized into columns by stage. Each card shows the customer name, price, and date.</p>
+
+  <p>To move a card to a different stage:</p>
+  <ul class="step-list">
+    <li>
+      <div class="step-num">1</div>
+      <div class="step-text">Tap the card you want to move. It will highlight with a blue border to show it is selected.</div>
+    </li>
+    <li>
+      <div class="step-num">2</div>
+      <div class="step-text">Tap the column heading you want to move it to (for example, tap <strong>Scheduled</strong> to move it to the Scheduled column).</div>
+    </li>
+    <li>
+      <div class="step-num">3</div>
+      <div class="step-text">The card moves immediately and the Google Sheet updates in the background. No save button needed.</div>
+    </li>
+  </ul>
+
+  <table class="sheet-table">
+    <tr><th>Stage</th><th>What it means</th></tr>
+    <tr><td>Lead</td><td>Initial inquiry — nothing sent yet</td></tr>
+    <tr><td>Estimate Sent</td><td>Proposal has been emailed to the customer (set automatically when submitted)</td></tr>
+    <tr><td>Accepted</td><td>Customer clicked Accept (set automatically)</td></tr>
+    <tr><td>Scheduled</td><td>Job has been booked — move here manually</td></tr>
+    <tr><td>Completed</td><td>Installation is done — move here manually</td></tr>
+    <tr><td>Post-Install Follow Up</td><td>Job done, awaiting final check-in or punch list</td></tr>
+    <tr><td>Lost</td><td>Customer decided not to proceed</td></tr>
+  </table>
+
+
+  <!-- ── Troubleshooting ── -->
+  <h2 id="troubleshoot">Troubleshooting</h2>
+
+  <h3>App Issues</h3>
+  <table class="sheet-table">
+    <tr><th>Problem</th><th>What to do</th></tr>
+    <tr>
+      <td>App won't load / blank screen</td>
+      <td>Close Safari completely (swipe it away in the app switcher) and reopen. If still not working, check your internet connection.</td>
+    </tr>
+    <tr>
+      <td>Estimates Queue is empty</td>
+      <td>The office needs to add a row to the Estimates Queue tab in the Google Sheet. The app shows exactly what is in that tab.</td>
+    </tr>
+    <tr>
+      <td>Email send fails</td>
+      <td>Your email password may be wrong. Tap your name in the top-right corner of the app, confirm switching users, then select your name again and re-enter your password carefully.</td>
+    </tr>
+    <tr>
+      <td>Proposal not appearing in the sheet</td>
+      <td>The sync requires an internet connection at the moment you tap Submit. Make sure you have Wi-Fi or cellular data. Try submitting again — it will not create a duplicate if the job was already saved.</td>
+    </tr>
+    <tr>
+      <td>Customer info did not pre-fill from queue</td>
+      <td>This can happen if the app loaded before the queue refreshed. Go back to the Estimates Queue screen and tap Start Estimate again.</td>
+    </tr>
+  </table>
+
+  <h3>Google Sheet Issues</h3>
+  <table class="sheet-table">
+    <tr><th>Problem</th><th>What to do</th></tr>
+    <tr>
+      <td>Status did not update when customer accepted</td>
+      <td>Wait 30 seconds and refresh the sheet. If it still has not updated, the customer may not have clicked the link yet — or their email went to spam.</td>
+    </tr>
+    <tr>
+      <td>Headers are missing or columns are out of order</td>
+      <td>Contact the person who manages the App Script. They can re-run "setupHeaders" to restore all headers and dropdowns.</td>
+    </tr>
+    <tr>
+      <td>Dropdown is missing from Status or Job Type column</td>
+      <td>Same as above — the "setupHeaders" script needs to be re-run.</td>
+    </tr>
+    <tr>
+      <td>Row color is not changing to green after marking Resolved</td>
+      <td>Make sure you are selecting from the dropdown (click the cell, then click the dropdown arrow) rather than typing. The conditional formatting only triggers on exact values.</td>
+    </tr>
+  </table>
+
+  <div style="text-align:center; margin-top:56px; color:#94a3b8; font-size:13px; line-height:2;">
+    <strong style="color:#64748b;">W.L. Toomey Irrigation</strong><br>
+    (781) 937-0552 &nbsp;&bull;&nbsp; www.ToomeyIrrigation.com<br>
+    App: colins4220.github.io/Toomey-estimates
+  </div>
+
+</div>
+</body>
+</html>

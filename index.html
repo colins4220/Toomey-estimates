@@ -1327,7 +1327,7 @@ async function generateJobPDF(jobType, customer, photos, selectedItems, laborHou
 }
 
 // ── JobFlow ───────────────────────────────────────────────────────────────────
-function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
+function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex, onQueueComplete }) {
   const jt = JOB_TYPES.find(j => j.id === jobType) || {};
   const STEPS = ['Photos', 'Materials', 'Review'];
   const [step, setStep]     = useState(0);
@@ -1446,6 +1446,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser }) {
         const sheetsResult = await sheetsResp.json();
         if (sheetsResult.acceptUrl) setAcceptUrl(sheetsResult.acceptUrl);
       } catch(e) { console.warn('Sheets sync failed (non-fatal):', e); }
+      if (queueRowIndex && onQueueComplete) { onQueueComplete(); }
     } catch(e) { console.error('Submit error:', e); }
     setSaving(false);
     setDone(true);
@@ -1903,33 +1904,54 @@ function EstimatesQueueScreen({ onBack, onStartEstimate }) {
               <div style={{fontSize:13,marginTop:6,lineHeight:1.5}}>Office can add upcoming visits to the Estimates Queue tab in Google Sheets</div>
             </div>
           )}
-          {queue.map((item, i) => (
+          {queue.map((item, i) => {
+            const JOB_TYPE_LABELS = { new_installation:'New Install', revamp:'Re-Vamp', service_call:'Service Call', system_recommendations:'System Recs' };
+            const JOB_TYPE_COLORS = { new_installation:'#166534', revamp:'#92400e', service_call:'#1e40af', system_recommendations:'#6b21a8' };
+            const JOB_TYPE_BG    = { new_installation:'#dcfce7', revamp:'#fef3c7', service_call:'#dbeafe', system_recommendations:'#f3e8ff' };
+            const mappedType = item.job_type;
+            const typeLabel  = JOB_TYPE_LABELS[mappedType] || item.job_type_raw || '';
+            const typeColor  = JOB_TYPE_COLORS[mappedType] || '#475569';
+            const typeBg     = JOB_TYPE_BG[mappedType]    || '#f1f5f9';
+            return (
             <div key={i} style={{background:'#f8fafc',borderRadius:16,padding:'16px 18px',marginBottom:12,border:'2px solid #e2e8f0'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
-                <div>
+                <div style={{flex:1}}>
                   <div style={{fontSize:17,fontWeight:700,color:'#1a3a6b'}}>{item.customerName}</div>
                   {item.address && <div style={{fontSize:13,color:'#64748b',marginTop:2}}>{item.address}</div>}
                   {item.phone   && <div style={{fontSize:13,color:'#64748b'}}>{item.phone}</div>}
                 </div>
-                {item.scheduledDate && (
-                  <div style={{fontSize:12,fontWeight:700,color:'#0284c7',background:'#e0f2fe',padding:'4px 10px',borderRadius:8,flexShrink:0,marginLeft:8}}>
-                    {item.scheduledDate}
-                  </div>
-                )}
+                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,marginLeft:8,flexShrink:0}}>
+                  {item.scheduledDate && (
+                    <div style={{fontSize:12,fontWeight:700,color:'#0284c7',background:'#e0f2fe',padding:'4px 10px',borderRadius:8}}>
+                      {item.scheduledDate}
+                    </div>
+                  )}
+                  {typeLabel && (
+                    <div style={{fontSize:12,fontWeight:700,color:typeColor,background:typeBg,padding:'4px 10px',borderRadius:8}}>
+                      {typeLabel}
+                    </div>
+                  )}
+                </div>
               </div>
               {item.jobDescription && (
-                <div style={{fontSize:13,color:'#475569',background:'#f1f5f9',borderRadius:8,padding:'8px 10px',marginBottom:10}}>
+                <div style={{fontSize:13,color:'#475569',background:'#f1f5f9',borderRadius:8,padding:'8px 10px',marginBottom:8}}>
                   {item.jobDescription}
                 </div>
               )}
-              {item.notes && <div style={{fontSize:12,color:'#64748b',marginBottom:10}}><strong>Notes:</strong> {item.notes}</div>}
+              {item.notes && (
+                <div style={{background:'#fffbeb',border:'1.5px solid #fcd34d',borderRadius:10,padding:'10px 12px',marginBottom:10}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'#92400e',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>Office Notes (Internal)</div>
+                  <div style={{fontSize:13,color:'#78350f',lineHeight:1.5}}>{item.notes}</div>
+                </div>
+              )}
               {item.assignedTo && <div style={{fontSize:12,color:'#94a3b8',marginBottom:10}}>Assigned to: {item.assignedTo}</div>}
               <button
-                onClick={() => onStartEstimate({ name: item.customerName, address: item.address || '', phone: item.phone || '', email: item.email || '' })}
+                onClick={() => onStartEstimate({ name: item.customerName, address: item.address || '', phone: item.phone || '', email: item.email || '', rowIndex: item.row_index, jobType: mappedType || null })}
                 style={{width:'100%',padding:'11px',borderRadius:10,border:'none',background:'#1a3a6b',color:'white',fontSize:15,fontWeight:700,cursor:'pointer',WebkitTapHighlightColor:'transparent'}}
-              >Start Estimate →</button>
+              >{mappedType ? 'Start ' + (typeLabel || 'Estimate') + ' →' : 'Start Estimate →'}</button>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
       <div className="nav-bar">
@@ -2152,7 +2174,7 @@ function PastProposalsScreen({ onBack }) {
     setLoading(true);
     setSearched(true);
     try {
-      const r = await fetch(APPS_SCRIPT_URL + '?action=search_proposals&q=' + encodeURIComponent(query.trim()));
+      const r = await fetch(APPS_SCRIPT_URL + '?action=search_proposals&query=' + encodeURIComponent(query.trim()));
       const data = await r.json();
       setResults(data.results || []);
     } catch(e) {
@@ -2507,6 +2529,7 @@ function App() {
   const [jobType, setJobType]               = useState(null);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [queueCustomer, setQueueCustomer]   = useState(null);
+  const [queueRowIndex, setQueueRowIndex]   = useState(null);
 
   // Customer
   const [name,    setName]    = useState(draft.name    || "");
@@ -2684,8 +2707,12 @@ function App() {
         })
       });
     } catch(e) { console.warn('Sheets sync failed (non-fatal):', e); }
+    if (queueRowIndex) {
+      fetch(APPS_SCRIPT_URL + '?action=update_queue_status&row_index=' + queueRowIndex + '&status=Completed').catch(() => {});
+      setQueueRowIndex(null);
+    }
   }
-  
+
   async function sendToClient() {
     if (!pdfId) return;
     
@@ -2940,7 +2967,24 @@ function App() {
     return (
       <EstimatesQueueScreen
         onBack={() => setJobType(null)}
-        onStartEstimate={(customer) => { setQueueCustomer(customer); setJobType(null); }}
+        onStartEstimate={(customer) => {
+          setQueueRowIndex(customer.rowIndex || null);
+          if (customer.jobType) {
+            // Known job type — skip HomeScreen, go straight to form
+            if (customer.jobType === 'new_installation') {
+              setName(customer.name || '');
+              setAddress(customer.address || '');
+              setEmail(customer.email || '');
+            } else {
+              setSelectedCustomer(customer);
+            }
+            setJobType(customer.jobType);
+          } else {
+            // No job type — go to HomeScreen for selection
+            setQueueCustomer(customer);
+            setJobType(null);
+          }
+        }}
       />
     );
   }
@@ -2974,6 +3018,13 @@ function App() {
           onBack={() => setSelectedCustomer(null)}
           onHome={() => { setJobType(null); setSelectedCustomer(null); }}
           currentUser={currentUser}
+          queueRowIndex={queueRowIndex}
+          onQueueComplete={() => {
+            if (queueRowIndex) {
+              fetch(APPS_SCRIPT_URL + '?action=update_queue_status&row_index=' + queueRowIndex + '&status=Completed').catch(() => {});
+              setQueueRowIndex(null);
+            }
+          }}
         />
       );
     }
