@@ -351,6 +351,8 @@ window.TFB={
 const { useState, useEffect, useRef } = React;
 
 const TIMER_OPTIONS = [
+  "Hunter Pro-HC Hydrawise 12 Station",
+  "Hunter Pro-HC Hydrawise 24 Station",
   "Hunter Pro-C",
   "Hunter HC-WiFi Timer (12 Station)",
   "Hunter HC-WiFi Timer (24 Station)",
@@ -549,10 +551,20 @@ function Stepper({ label, value, onChange, icon }) {
           onClick={() => onChange(Math.max(0, value - 1))}
           aria-label={"Decrease " + label}
         >−</button>
-        <div className={"stepper-val" + (value === 0 ? " zero" : "")}>{value}</div>
+        <input
+          type="number"
+          min="0"
+          max="999"
+          value={value === 0 ? '' : value}
+          onChange={e => onChange(Math.max(0, Math.min(999, parseInt(e.target.value) || 0)))}
+          onBlur={e => { if (e.target.value === '') onChange(0); }}
+          placeholder="0"
+          className={"stepper-val" + (value === 0 ? " zero" : "")}
+          style={{width:52,textAlign:'center',border:'none',background:'transparent',outline:'none',WebkitAppearance:'none',MozAppearance:'textfield',fontFamily:'inherit'}}
+        />
         <button
           className="stepper-btn plus"
-          onClick={() => onChange(Math.min(60, value + 1))}
+          onClick={() => onChange(Math.min(999, value + 1))}
           aria-label={"Increase " + label}
         >+</button>
       </div>
@@ -2614,15 +2626,18 @@ function App() {
     setDrip(0); setZones(0); setValves(0);
     setTimer(TIMER_OPTIONS[0]);
     setPrice(""); setPriceOverride(""); setNotes(""); setSidewalk(""); setOther("");
+    setCurrentJobId(null);
   }
 
   const [pdfId, setPdfId] = useState(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [customMessage, setCustomMessage] = useState("");
-  
+  const [currentJobId, setCurrentJobId] = useState(null);
+
   async function generate() {
     setLoading(true);
-    const jobId = `install_${Date.now()}`;
+    const jobId = currentJobId || `install_${Date.now()}`;
+    if (!currentJobId) setCurrentJobId(jobId);
 
     const estimateData = {
       customer_name: name,
@@ -2704,6 +2719,7 @@ function App() {
           grandTotal:      rawPrice,
           notes,
           pgp, mp, pro4, drip, zones,
+          addOnNotes: [sidewalk, other].filter(Boolean).join(' | '),
         })
       });
     } catch(e) { console.warn('Sheets sync failed (non-fatal):', e); }
@@ -2873,7 +2889,7 @@ function App() {
         </div>
 
         <div className="nav-bar">
-          <button className="nav-btn-back" onClick={() => { setDone(false); setStep(3); }}>← Edit</button>
+          <button className="nav-btn-back" onClick={() => { setDone(false); setStep(1); }}>← Edit</button>
           <button className="nav-btn-primary" onClick={reset}>+ New Estimate</button>
         </div>
       </div>
