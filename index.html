@@ -1514,7 +1514,9 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
           accept_url:        acceptUrl,
         })
       });
-      const result = await resp.json();
+      const rawText = await resp.text();
+      let result;
+      try { result = JSON.parse(rawText); } catch(e) { throw new Error(rawText.slice(0, 300)); }
       if (!resp.ok || result.error) throw new Error(result.error || 'Send failed');
       setSendStatus('sent');
     } catch(e) {
@@ -2736,24 +2738,25 @@ function App() {
     
     try {
       const BACKEND_URL = 'https://toomey-backend-production.up.railway.app';
-      
+
       const response = await fetch(`${BACKEND_URL}/send-pdf/${pdfId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: customMessage.trim() })
       });
-      
-      const result = await response.json();
-      
+
+      const text = await response.text();
+      let result;
+      try { result = JSON.parse(text); } catch(e) { result = { error: text.slice(0, 300) }; }
+
       if (result.success) {
         alert(`✅ Proposal sent to ${email}!`);
-        setCustomMessage(""); // Clear message after sending
+        setCustomMessage("");
       } else {
-        alert('Failed to send email: ' + (result.error || 'Unknown error'));
+        alert('Email error: ' + (result.error || 'Unknown error'));
       }
     } catch (err) {
-      console.error('Email send failed:', err);
-      alert('Failed to send email. Please try again.');
+      alert('Network error: ' + err.message);
     }
     
     setSendingEmail(false);
