@@ -1473,7 +1473,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
           })
         });
         const sheetsResult = await sheetsResp.json();
-        if (sheetsResult.acceptUrl) setAcceptUrl(sheetsResult.acceptUrl);
+        if (sheetsResult.accept_url) setAcceptUrl(sheetsResult.accept_url);
         showToast('✅ Synced to Google Sheets');
       } catch(e) { console.warn('Sheets sync failed:', e); showToast('⚠️ Sheet sync failed — check connection', 'error'); }
       if (queueRowIndex && onQueueComplete) { onQueueComplete(); }
@@ -2784,7 +2784,7 @@ function App() {
         })
       });
       const syncResult = await syncResp.json().catch(() => ({}));
-      if (syncResult.acceptUrl) setInstallAcceptUrl(syncResult.acceptUrl);
+      if (syncResult.accept_url) setInstallAcceptUrl(syncResult.accept_url);
       showToast('✅ Synced to Google Sheets');
     } catch(e) { console.warn('Sheets sync failed:', e); showToast('⚠️ Sheet sync failed — check connection', 'error'); }
     if (queueRowIndex) {
