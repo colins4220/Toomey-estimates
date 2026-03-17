@@ -1363,6 +1363,8 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
   const [done, setDone]       = useState(false);
   const [saving, setSaving]   = useState(false);
   const [acceptUrl, setAcceptUrl] = useState('');
+  const [submittedJobId, setSubmittedJobId] = useState('');
+  const [driveUrl, setDriveUrl] = useState('');
 
   // Photos
   const [photos, setPhotos]         = useState([]);
@@ -1435,6 +1437,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
     setSaving(true);
     try {
       const jobId = `job_${Date.now()}`;
+      setSubmittedJobId(jobId);
       if (window.TFB) {
         const photoData = await Promise.all(photos.map(async (p, i) => {
           const url = await window.TFB.uploadPhoto(p.dataUrl, `jobs/${jobId}_photo${i}.jpg`);
@@ -1523,7 +1526,9 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
           filename,
           to_email:          sendEmail.trim(),
           customer_name:     customer.name,
+          job_type:          jobType,
           job_type_label:    jt2.label || jobType,
+          firebase_id:       submittedJobId,
           prepared_by_name:  currentUser?.name  || '',
           prepared_by_email: currentUser?.email || '',
           smtp_password:     currentUser?.smtp_password || '',
@@ -1536,6 +1541,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
       let result;
       try { result = JSON.parse(rawText); } catch(e) { throw new Error(rawText.slice(0, 300)); }
       if (!resp.ok || result.error) throw new Error(result.error || 'Send failed');
+      if (result.driveUrl) setDriveUrl(result.driveUrl);
       setSendStatus('sent');
     } catch(e) {
       setSendError(`Send failed: ${e.message || 'Network error — check your connection and try again.'}`);
@@ -1637,7 +1643,10 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
                     <div style={{padding:'10px 14px',borderRadius:10,background:'#fef2f2',border:'1.5px solid #fca5a5',color:'#dc2626',fontSize:14,marginBottom:10}}>{sendError}</div>
                   )}
                   {sendStatus === 'sent' && (
-                    <div style={{padding:'10px 14px',borderRadius:10,background:'#f0fdf4',border:'1.5px solid #86efac',color:'#166534',fontSize:14,fontWeight:600,marginBottom:10}}>✅ Email sent successfully!</div>
+                    <div>
+                      <div style={{padding:'10px 14px',borderRadius:10,background:'#f0fdf4',border:'1.5px solid #86efac',color:'#166534',fontSize:14,fontWeight:600,marginBottom:10}}>✅ Email sent successfully!</div>
+                      {driveUrl && <a href={driveUrl} target="_blank" rel="noopener noreferrer" style={{display:'block',padding:'11px',borderRadius:10,background:'#eff6ff',border:'1.5px solid #2563eb',color:'#2563eb',textAlign:'center',fontWeight:700,fontSize:14,textDecoration:'none',marginBottom:6}}>📄 Open PDF in Drive</a>}
+                    </div>
                   )}
                   {sendStatus !== 'sent' && (
                     <button onClick={sendPDF} disabled={sendStatus==='sending'||!sendEmail.trim()}
@@ -2672,6 +2681,7 @@ function App() {
   const [customMessage, setCustomMessage] = useState("");
   const [currentJobId, setCurrentJobId] = useState(null);
   const [installAcceptUrl, setInstallAcceptUrl] = useState('');
+  const [installDriveUrl, setInstallDriveUrl] = useState('');
 
   async function generate() {
     setLoading(true);
@@ -2790,6 +2800,7 @@ function App() {
       try { result = JSON.parse(text); } catch(e) { result = { error: text.slice(0, 300) }; }
 
       if (result.success) {
+        if (result.driveUrl) setInstallDriveUrl(result.driveUrl);
         alert(`✅ Proposal sent to ${email}!`);
         setCustomMessage("");
       } else {
@@ -2928,6 +2939,12 @@ function App() {
                     >
                       {sendingEmail ? '📧 Sending...' : `📧 Send to ${name}`}
                     </button>
+                    {installDriveUrl && (
+                      <a href={installDriveUrl} target="_blank" rel="noopener noreferrer"
+                        style={{display:'block',padding:'14px',borderRadius:12,background:'#eff6ff',border:'1.5px solid #2563eb',color:'#2563eb',textAlign:'center',fontWeight:700,fontSize:15,textDecoration:'none'}}>
+                        📄 Open PDF in Drive
+                      </a>
+                    )}
                   </>
                 )}
                 

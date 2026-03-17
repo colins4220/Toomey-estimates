@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W.L. Toomey Irrigation — App & Sheet Guide</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 12pt;
+    color: #111;
+    background: #fff;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 32px;
+    line-height: 1.6;
+  }
+
+  /* ── Cover ── */
+  .cover {
+    text-align: center;
+    padding: 60px 0 50px;
+    border-bottom: 2px solid #111;
+    margin-bottom: 40px;
+  }
+  .cover h1 {
+    font-size: 24pt;
+    font-weight: bold;
+    letter-spacing: 0.02em;
+    margin-bottom: 8px;
+  }
+  .cover .sub {
+    font-size: 13pt;
+    color: #444;
+    margin-bottom: 6px;
+  }
+  .cover .date {
+    font-size: 10pt;
+    color: #777;
+    margin-top: 16px;
+  }
+
+  /* ── Section headers ── */
+  h2 {
+    font-size: 15pt;
+    font-weight: bold;
+    border-bottom: 1.5px solid #333;
+    padding-bottom: 5px;
+    margin: 36px 0 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  h3 {
+    font-size: 12pt;
+    font-weight: bold;
+    margin: 20px 0 8px;
+  }
+
+  h4 {
+    font-size: 11pt;
+    font-weight: bold;
+    margin: 14px 0 5px;
+    font-style: italic;
+  }
+
+  p { margin-bottom: 10px; }
+
+  ul, ol {
+    margin: 6px 0 12px 22px;
+  }
+  li { margin-bottom: 5px; }
+
+  /* ── Role badge ── */
+  .role-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin: 36px 0 6px;
+    border-bottom: 1.5px solid #333;
+    padding-bottom: 5px;
+  }
+  .role-header h2 {
+    border: none;
+    margin: 0;
+    padding: 0;
+  }
+  .role-tag {
+    font-size: 9pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: 1px solid #333;
+    padding: 2px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+
+  /* ── Step list ── */
+  .steps { margin: 8px 0 14px 0; }
+  .step {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 9px;
+    align-items: flex-start;
+  }
+  .step-num {
+    min-width: 22px;
+    height: 22px;
+    border: 1.5px solid #333;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9pt;
+    font-weight: bold;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-text { flex: 1; }
+
+  /* ── Info box ── */
+  .box {
+    border: 1px solid #aaa;
+    padding: 12px 16px;
+    margin: 14px 0;
+    background: #f9f9f9;
+  }
+  .box.important {
+    border-left: 4px solid #333;
+    background: #f4f4f4;
+  }
+  .box p:last-child { margin-bottom: 0; }
+
+  /* ── Tab table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 18px;
+    font-size: 11pt;
+  }
+  th {
+    background: #111;
+    color: #fff;
+    text-align: left;
+    padding: 7px 10px;
+    font-size: 10pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #ddd;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f7f7f7; }
+
+  /* ── Page breaks ── */
+  .page-break { page-break-before: always; }
+
+  /* ── Print ── */
+  @media print {
+    body { padding: 20px 24px; }
+    .cover { padding: 30px 0 30px; }
+    a { text-decoration: none; color: #111; }
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <h1>W.L. Toomey Irrigation</h1>
+  <div class="sub">Estimator App &amp; Google Sheet — Team Guide</div>
+  <div class="sub" style="font-size:11pt; color:#555;">How to use the system from start to finish</div>
+  <div class="date">Printed: <script>document.write(new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}))</script></div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     SECTION 1 — OVERVIEW
+══════════════════════════════════════════════ -->
+<h2>1. System Overview</h2>
+
+<p>The Toomey Estimator is an iPad app used in the field to build proposals and sync them automatically to Google Sheets. Every estimate submitted from the app becomes a permanent record in the sheet. The sheet is the single source of truth for all jobs.</p>
+
+<table>
+  <tr><th>Tool</th><th>What It's For</th><th>Who Uses It</th></tr>
+  <tr><td><strong>Estimator App</strong></td><td>Build proposals in the field, generate PDFs, sync to sheet</td><td>Estimators</td></tr>
+  <tr><td><strong>Google Sheet</strong></td><td>Track all estimates and service calls; office manages queue</td><td>Everyone</td></tr>
+  <tr><td><strong>FieldCentral</strong></td><td>Dispatch, scheduling, and billing for all job types</td><td>Office Manager + Estimators</td></tr>
+</table>
+
+<div class="box important">
+  <p><strong>Important:</strong> The app and Google Sheet stay in sync automatically. When an estimator submits a proposal, it appears in the sheet within seconds. The sheet should never need to be edited manually for estimates — only for service calls and the estimates queue.</p>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     SECTION 2 — GOOGLE SHEET TABS
+══════════════════════════════════════════════ -->
+<h2>2. Google Sheet — Tab Reference</h2>
+
+<p>The Google Sheet has five tabs. Each tab has a specific purpose. Do not move data between tabs manually — the app handles routing automatically.</p>
+
+<table>
+  <tr><th>Tab</th><th>What Goes Here</th><th>Who Adds Entries</th></tr>
+  <tr>
+    <td><strong>Estimates Queue</strong></td>
+    <td>Upcoming customer visits that need an estimate. Once an estimator completes the estimate in the app, the row is automatically removed from this tab and routed to the correct job tab.</td>
+    <td>Office Manager</td>
+  </tr>
+  <tr>
+    <td><strong>New Installs</strong></td>
+    <td>All completed new installation proposals. Auto-populated when estimator submits from app.</td>
+    <td>App (automatic)</td>
+  </tr>
+  <tr>
+    <td><strong>Re-Vamps</strong></td>
+    <td>All completed re-vamp proposals. Auto-populated when estimator submits from app.</td>
+    <td>App (automatic)</td>
+  </tr>
+  <tr>
+    <td><strong>Service Calls</strong></td>
+    <td>All service calls regardless of how they came in — app, phone, or email. This is the source of truth for all service call activity. Office logs phone/email calls here manually.</td>
+    <td>App (automatic) + Office Manager (manual for phone/email)</td>
+  </tr>
+  <tr>
+    <td><strong>System Recommendations</strong></td>
+    <td>All system recommendation proposals. Auto-populated when estimator submits from app.</td>
+    <td>App (automatic)</td>
+  </tr>
+</table>
+
+<div class="box important">
+  <p><strong>Service Call Rule:</strong> Every service call — whether it comes in by phone, email, or through the app — must be logged in the Service Calls tab. This tab is the company's permanent record of all service activity. FieldCentral is where they get dispatched and billed, but the sheet is where they are tracked.</p>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     SECTION 3 — OFFICE MANAGER
+══════════════════════════════════════════════ -->
+<div class="page-break"></div>
+
+<div class="role-header">
+  <h2>3. Office Manager Workflow</h2>
+  <span class="role-tag">Office</span>
+</div>
+
+<h3>A. Managing the Estimates Queue</h3>
+<p>The Estimates Queue tab is how the office communicates upcoming visits to the estimators. When a customer calls to request an estimate, the office adds a row to the queue. The estimator sees it in the app before they arrive.</p>
+
+<div class="steps">
+  <div class="step"><div class="step-num">1</div><div class="step-text">Open the <strong>Estimates Queue</strong> tab in Google Sheets.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Add a new row with: <strong>Customer Name, Address, Phone, Email</strong> (if available), <strong>Scheduled Date</strong>, <strong>Job Type</strong>, and any <strong>Notes</strong> for the estimator.</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">The row will appear in the estimator's app automatically within a few minutes. No other action needed.</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-text">When the estimator completes the visit and submits from the app, the row is automatically removed from the queue and moved to the correct job tab (New Installs, Re-Vamps, etc.).</div></div>
+</div>
+
+<div class="box">
+  <p><strong>Job Types for the Queue:</strong> New Install, Re-Vamp, Service Call, System Recommendations. Use the exact spelling so the app routes the job correctly.</p>
+</div>
+
+<h3>B. Logging Service Calls (Phone or Email)</h3>
+<p>When a service call comes in that was not submitted through the app, the office logs it directly in the sheet.</p>
+
+<div class="steps">
+  <div class="step"><div class="step-num">1</div><div class="step-text">Open the <strong>Service Calls</strong> tab in Google Sheets.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Add a new row with: <strong>Customer Name, Address, Phone,</strong> and a brief <strong>Issue Description</strong>.</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">Log the call in <strong>FieldCentral</strong> for dispatch and billing.</div></div>
+</div>
+
+<div class="box important">
+  <p><strong>Remember:</strong> The Service Calls tab in Google Sheets is the master record. FieldCentral is where the call gets dispatched and billed. Both need to be updated — the sheet for tracking history, FieldCentral for operations.</p>
+</div>
+
+<h3>C. FieldCentral — Dispatch &amp; Billing</h3>
+<p>All jobs — new installs, re-vamps, service calls, and system recommendations — are dispatched and billed through FieldCentral. The Google Sheet and Estimator App are for tracking and proposal generation only. FieldCentral is the operational system.</p>
+
+<ul>
+  <li>Service calls come in → log in Sheet → create job in FieldCentral → dispatch tech</li>
+  <li>Estimate accepted → create job in FieldCentral → schedule install</li>
+  <li>All invoicing happens in FieldCentral</li>
+</ul>
+
+
+<!-- ══════════════════════════════════════════════
+     SECTION 4 — ESTIMATORS
+══════════════════════════════════════════════ -->
+<div class="page-break"></div>
+
+<div class="role-header">
+  <h2>4. Estimator Workflow</h2>
+  <span class="role-tag">Bill · Jerry · Colin</span>
+</div>
+
+<h3>A. Getting Started — Sign In</h3>
+<p>The app is saved to your iPad home screen. Open it like any app.</p>
+
+<div class="steps">
+  <div class="step"><div class="step-num">1</div><div class="step-text">On the home screen, tap your name.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Enter your email password when prompted. This is stored on your iPad only and is used to send proposals via email.</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">You only need to sign in once. The app remembers you until you sign out.</div></div>
+</div>
+
+<h3>B. Starting an Estimate from the Queue</h3>
+<p>If the office has scheduled a visit and added it to the Estimates Queue, it will appear in the app before you arrive. This is the preferred workflow.</p>
+
+<div class="steps">
+  <div class="step"><div class="step-num">1</div><div class="step-text">Tap <strong>Estimates Queue</strong> on the home screen.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Find your customer's card and tap <strong>Start Estimate</strong>. The app will pre-fill their name, address, and job type automatically.</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">If the job type is already known (e.g. New Install), the app skips straight to the estimate screen. No extra tapping needed.</div></div>
+</div>
+
+<h3>C. Starting a Walk-Up Estimate</h3>
+<p>For customers not in the queue, start a new estimate manually.</p>
+
+<div class="steps">
+  <div class="step"><div class="step-num">1</div><div class="step-text">Tap <strong>New Estimate</strong> on the home screen.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Select the job type: New Installation, Re-Vamp, Service Call, or System Recommendations.</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">Enter the customer's name, address, and email (email is optional but needed to send the proposal).</div></div>
+</div>
+
+<h3>D. Filling Out the Estimate</h3>
+
+<h4>New Installation</h4>
+<ul>
+  <li>Enter head counts: PGP-Ultra Rotary, MP-Rotor, Pro-4 Spray — tap + / − or type the number directly.</li>
+  <li>Enter right-side values: Drip Zones, Number of Zones, Irritrol Valves, and select the controller (Hydrawise timer).</li>
+  <li>Enter the <strong>Price</strong>. Numbers only — no $ sign needed.</li>
+  <li>Add <strong>Notes</strong> if needed (these print on the proposal).</li>
+  <li>Add-ons: Sidewalk Strip and Other (optional).</li>
+</ul>
+
+<h4>Re-Vamp, Service Call, System Recommendations</h4>
+<ul>
+  <li>Enter customer info, then select materials and labor from the item list.</li>
+  <li>Adjust quantities with + / −.</li>
+  <li>Add notes as needed.</li>
+  <li>A PDF is generated on your device (no internet required for this step).</li>
+</ul>
+
+<h3>E. Generating and Sending the Proposal</h3>
+
+<div class="steps">
+  <div class="step"><div class="step-num">1</div><div class="step-text">Tap <strong>Generate Proposal</strong>. For New Installs, this fills the Toomey template PDF. For other types, a PDF is built on-device.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Tap <strong>Preview</strong> to review the PDF before sending. Tap <strong>Download</strong> to save it to your iPad's Files app.</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">If the customer's email was entered, tap <strong>Send to Client</strong>. The proposal is emailed directly from your address.</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-text">Add a personal note before sending if you want to include a custom message in the email body.</div></div>
+  <div class="step"><div class="step-num">5</div><div class="step-text">A green <strong>"Synced to Google Sheets"</strong> notification confirms the estimate was recorded. If you see a red warning, the sync failed — check your connection and note the job details manually.</div></div>
+</div>
+
+<div class="box important">
+  <p><strong>If you need to edit after generating:</strong> Tap <strong>Edit</strong> on the done screen to go back and make changes, then regenerate. The sheet record will be updated, not duplicated.</p>
+</div>
+
+<h3>F. App Updates</h3>
+<p>When an update is available, a blue bar will appear at the top of the app saying <em>"App update available — tap here to refresh."</em> Tap it once and the app reloads with the latest version. You do not need to delete and re-add the app from your home screen.</p>
+
+
+<!-- ══════════════════════════════════════════════
+     SECTION 5 — JOB TYPE QUICK REFERENCE
+══════════════════════════════════════════════ -->
+<div class="page-break"></div>
+
+<h2>5. Job Type Quick Reference</h2>
+
+<table>
+  <tr><th>Job Type</th><th>When to Use</th><th>Sheet Tab</th></tr>
+  <tr>
+    <td><strong>New Installation</strong></td>
+    <td>Full new irrigation system design and estimate for a property with no existing system.</td>
+    <td>New Installs</td>
+  </tr>
+  <tr>
+    <td><strong>Re-Vamp</strong></td>
+    <td>Larger scope project on an existing system. Requires machine work.</td>
+    <td>Re-Vamps</td>
+  </tr>
+  <tr>
+    <td><strong>Service Call</strong></td>
+    <td>Urgent repairs that need to be completed, could not be done on initial visit.</td>
+    <td>Service Calls</td>
+  </tr>
+  <tr>
+    <td><strong>System Recommendations</strong></td>
+    <td>Upgrades or improvements the tech identifies that the customer has not requested — blocked heads, WiFi upgrades, peened solenoids, etc.</td>
+    <td>System Recommendations</td>
+  </tr>
+</table>
+
+
+<!-- ══════════════════════════════════════════════
+     SECTION 6 — TROUBLESHOOTING
+══════════════════════════════════════════════ -->
+<h2>6. Common Issues</h2>
+
+<table>
+  <tr><th>Problem</th><th>What to Do</th></tr>
+  <tr>
+    <td>Estimates Queue is empty or not loading</td>
+    <td>Tap the <strong>↻ Refresh</strong> button in the top-right of the queue screen. The app shows when the queue was last updated. If still empty, check your internet connection.</td>
+  </tr>
+  <tr>
+    <td>Red "Sheet sync failed" notification</td>
+    <td>The estimate was saved to your iPad but did not reach Google Sheets. Note the customer name and details. Re-submit when you have a connection, or notify the office to log it manually.</td>
+  </tr>
+  <tr>
+    <td>App seems outdated compared to another device</td>
+    <td>Wait for the blue update banner at the top of the app and tap it. If no banner appears, close Safari fully and reopen the app.</td>
+  </tr>
+  <tr>
+    <td>PDF preview won't open</td>
+    <td>On the iPad, go to <strong>Settings → Safari → Block Pop-ups</strong> and turn it <strong>off</strong>. The preview opens in a new tab.</td>
+  </tr>
+  <tr>
+    <td>Email send fails</td>
+    <td>Sign out and sign back in to re-enter your email password. If it continues to fail, download the PDF and email it manually from your email app.</td>
+  </tr>
+</table>
+
+
+<!-- ══════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════ -->
+<div style="margin-top:50px; padding-top:16px; border-top:1px solid #ccc; font-size:9pt; color:#777; text-align:center;">
+  W.L. Toomey Irrigation &nbsp;·&nbsp; Internal Use Only &nbsp;·&nbsp; (781) 937-0552 &nbsp;·&nbsp; ToomeyIrrigation.com
+</div>
+
+</body>
+</html>
