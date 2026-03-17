@@ -2030,31 +2030,16 @@ function EstimatesQueueScreen({ onBack, onStartEstimate }) {
 
 // ── ProposalDetail ────────────────────────────────────────────────────────────
 function ProposalDetail({ summary, onBack }) {
-  const [full,    setFull]    = useState(null);
-  const [loading, setLoading] = useState(true);
-
   const TYPE_ICONS = { 'New Installation':'🌱','Re-Vamp':'🔧','Service Call':'🛠','System Recommendations':'💡' };
 
-  useEffect(() => {
-    async function load() {
-      if (summary.firebaseId && window.TFB) {
-        const doc = await window.TFB.getById(summary.firebaseId);
-        setFull(doc);
-      }
-      setLoading(false);
-    }
-    load();
-  }, []);
-
   const statusColor = summary.status === 'Accepted to be Scheduled' ? {bg:'#dcfce7',fg:'#16a34a'} : {bg:'#f1f5f9',fg:'#64748b'};
-  const data = full || {};
-  const customer  = data.customer  || {};
-  const photos    = data.photos    || [];
-  const materials = data.materials || [];
-  const labor     = data.labor     || {};
-  const totals    = data.totals    || {};
-  const system    = data.system    || {};
-  const addOns    = data.addOns    || {};
+  const customer  = {};
+  const photos    = [];
+  const materials = [];
+  const labor     = {};
+  const totals    = {};
+  const system    = {};
+  const addOns    = {};
 
   return (
     <div id="app-inner">
@@ -2086,13 +2071,6 @@ function ProposalDetail({ summary, onBack }) {
         </div>
 
         <div className="card-body">
-          {loading && <div style={{textAlign:'center',padding:40,color:'#64748b'}}>Loading full proposal...</div>}
-
-          {!loading && !full && (
-            <div style={{background:'#fffbeb',border:'1.5px solid #fde68a',borderRadius:10,padding:'12px 14px',marginBottom:16,fontSize:13,color:'#92400e'}}>
-              Full detail not available for proposals submitted before this feature was added. Showing summary data only.
-            </div>
-          )}
 
           {/* Contact info */}
           {(customer.phone || summary.phone || customer.email || summary.email) && (
