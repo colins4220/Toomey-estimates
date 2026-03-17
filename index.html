@@ -2693,6 +2693,7 @@ function App() {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [customMessage, setCustomMessage] = useState("");
   const [currentJobId, setCurrentJobId] = useState(null);
+  const [installAcceptUrl, setInstallAcceptUrl] = useState('');
 
   async function generate() {
     setLoading(true);
@@ -2765,7 +2766,7 @@ function App() {
     // Sync to Google Sheets
     try {
       const rawPrice = String(displayPrice).replace(/,/g,'');
-      await fetch('https://toomey-backend-production.up.railway.app/sync-to-sheets', {
+      const syncResp = await fetch('https://toomey-backend-production.up.railway.app/sync-to-sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2782,6 +2783,8 @@ function App() {
           addOnNotes: [sidewalk, other].filter(Boolean).join(' | '),
         })
       });
+      const syncResult = await syncResp.json().catch(() => ({}));
+      if (syncResult.acceptUrl) setInstallAcceptUrl(syncResult.acceptUrl);
       showToast('✅ Synced to Google Sheets');
     } catch(e) { console.warn('Sheets sync failed:', e); showToast('⚠️ Sheet sync failed — check connection', 'error'); }
     if (queueRowIndex) {
@@ -2801,7 +2804,7 @@ function App() {
       const response = await fetch(`${BACKEND_URL}/send-pdf/${pdfId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: customMessage.trim() })
+        body: JSON.stringify({ message: customMessage.trim(), accept_url: installAcceptUrl || '' })
       });
 
       const text = await response.text();

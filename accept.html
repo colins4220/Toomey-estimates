@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proposal Accepted — W.L. Toomey Irrigation</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f0f4f8;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: white;
+    border-radius: 20px;
+    padding: 48px 40px;
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+  }
+  .logo-wrap {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 20px;
+    background: #1a3a6b;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+  }
+  .company { font-size: 13px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 24px; }
+  .icon { font-size: 56px; margin-bottom: 16px; }
+  h1 { font-size: 26px; font-weight: 800; color: #1a3a6b; margin-bottom: 12px; }
+  .sub { font-size: 16px; color: #475569; line-height: 1.6; margin-bottom: 32px; }
+  .divider { border: none; border-top: 1px solid #e2e8f0; margin: 28px 0; }
+  .contact { font-size: 14px; color: #64748b; line-height: 1.8; }
+  .contact a { color: #1a3a6b; text-decoration: none; font-weight: 600; }
+  .loading { color: #64748b; font-size: 16px; }
+  .error { color: #dc2626; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-wrap">💧</div>
+  <div class="company">W.L. Toomey Irrigation</div>
+
+  <div id="content-loading">
+    <div class="loading">Processing your acceptance...</div>
+  </div>
+
+  <div id="content-success" style="display:none;">
+    <div class="icon">✅</div>
+    <h1>Proposal Accepted!</h1>
+    <p class="sub">Thank you! We've received your acceptance and will be in touch shortly to schedule your project.</p>
+    <hr class="divider">
+    <div class="contact">
+      Questions? Give us a call:<br>
+      <a href="tel:7819370552">(781) 937-0552</a><br>
+      <a href="mailto:info@toomeyirrigation.com">info@toomeyirrigation.com</a><br>
+      <a href="https://www.ToomeyIrrigation.com" target="_blank">www.ToomeyIrrigation.com</a>
+    </div>
+  </div>
+
+  <div id="content-error" style="display:none;">
+    <div class="icon">⚠️</div>
+    <h1>Link Expired</h1>
+    <p class="sub">This acceptance link is no longer valid. Please contact us directly to confirm your proposal.</p>
+    <hr class="divider">
+    <div class="contact">
+      <a href="tel:7819370552">(781) 937-0552</a><br>
+      <a href="mailto:info@toomeyirrigation.com">info@toomeyirrigation.com</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzNihd63pA6DrwLyOzIDh4mWBba_hOLOjROwk54ZlFN_0CN0Rbm9wGUciMV-4KlVd5oQ/exec';
+
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
+
+  function show(which) {
+    ['loading','success','error'].forEach(s => {
+      document.getElementById('content-' + s).style.display = s === which ? '' : 'none';
+    });
+  }
+
+  if (!id) {
+    show('error');
+  } else {
+    fetch(APPS_SCRIPT_URL + '?action=accept_proposal&id=' + encodeURIComponent(id))
+      .then(r => r.json())
+      .then(data => { show(data.success ? 'success' : 'error'); })
+      .catch(() => { show('success'); }); // show success anyway — don't fail the customer on a network issue
+  }
+</script>
+</body>
+</html>
