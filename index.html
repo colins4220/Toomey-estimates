@@ -2023,7 +2023,11 @@ function EstimatesQueueScreen({ onBack, onStartEstimate }) {
               )}
               {item.assignedTo && <div style={{fontSize:12,color:'#94a3b8',marginBottom:10}}>Assigned to: {item.assignedTo}</div>}
               <button
-                onClick={() => onStartEstimate({ name: item.customerName || item.name || '', address: item.address || '', town: item.town || '', phone: item.phone || '', email: item.email || '', rowIndex: item.rowIndex || item.row_index || null, jobType: item.job_type || item.jobType || null })}
+                onClick={() => {
+                  const JT_NORM_BTN = {'new_installation':'new_installation','New Install':'new_installation','New Installation':'new_installation','revamp':'revamp','Re-Vamp':'revamp','Revamp':'revamp','service_call':'service_call','Service Call':'service_call','system_recommendations':'system_recommendations','System Recs':'system_recommendations','System Recommendations':'system_recommendations'};
+                  const rawJt = item.job_type || item.jobType || '';
+                  onStartEstimate({ name: item.customerName || item.name || '', address: item.address || '', town: item.town || '', phone: item.phone || '', email: item.email || '', rowIndex: item.rowIndex || item.row_index || null, jobType: JT_NORM_BTN[rawJt] || null });
+                }}
                 style={{width:'100%',padding:'11px',borderRadius:10,border:'none',background:'#1a3a6b',color:'white',fontSize:15,fontWeight:700,cursor:'pointer',WebkitTapHighlightColor:'transparent'}}
               >{mappedType ? 'Start ' + (typeLabel || 'Estimate') + ' →' : 'Start Estimate →'}</button>
             </div>
@@ -2980,14 +2984,8 @@ function App() {
       <EstimatesQueueScreen
         onBack={() => setJobType(null)}
         onStartEstimate={(customer) => {
-          // Normalize job type: sheet may have ID or display label
-          const JT_NORM = {
-            'new_installation':'new_installation','New Install':'new_installation','New Installation':'new_installation',
-            'revamp':'revamp','Re-Vamp':'revamp','Revamp':'revamp',
-            'service_call':'service_call','Service Call':'service_call',
-            'system_recommendations':'system_recommendations','System Recs':'system_recommendations','System Recommendations':'system_recommendations',
-          };
-          const jt = JT_NORM[customer.jobType] || customer.jobType || null;
+          // jobType is already validated/normalized at button level (null if unknown)
+          const jt = customer.jobType;
           setQueueRowIndex(customer.rowIndex || null);
           if (jt) {
             if (jt === 'new_installation') {
