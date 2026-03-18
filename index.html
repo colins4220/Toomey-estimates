@@ -2043,13 +2043,15 @@ function ProposalDetail({ summary, onBack }) {
   const TYPE_ICONS = { 'New Installation':'🌱','Re-Vamp':'🔧','Service Call':'🛠','System Recommendations':'💡' };
 
   const statusColor = summary.status === 'Accepted to be Scheduled' ? {bg:'#dcfce7',fg:'#16a34a'} : {bg:'#f1f5f9',fg:'#64748b'};
-  const customer  = {};
-  const photos    = [];
-  const materials = [];
-  const labor     = {};
-  const totals    = {};
-  const system    = {};
-  const addOns    = {};
+  const isNewInstall = summary.jobType === 'New Installation';
+
+  const systemRows = [
+    ['Hunter PGP-Ultra Rotary', summary.pgp],
+    ['Rotor Streamer (MP)',      summary.mp],
+    ['Hunter Pro-4 Spray',       summary.pro4],
+    ['Drip Zones',               summary.drip],
+    ['# of Zones',               summary.zones],
+  ].filter(([, v]) => Number(v) > 0);
 
   return (
     <div id="app-inner">
@@ -2062,7 +2064,6 @@ function ProposalDetail({ summary, onBack }) {
       </div>
 
       <div className="card">
-        {/* Header */}
         <div className="card-header" style={{padding:'20px 22px'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
             <div>
@@ -2082,128 +2083,44 @@ function ProposalDetail({ summary, onBack }) {
 
         <div className="card-body">
 
-          {/* Contact info */}
-          {(customer.phone || summary.phone || customer.email || summary.email) && (
+          {/* New Install: Your System */}
+          {isNewInstall && systemRows.length > 0 && (
             <div style={{marginBottom:18}}>
-              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Contact</div>
-              {(customer.phone || summary.phone) && <div style={{fontSize:14,color:'#1e293b',marginBottom:4}}>📞 {customer.phone || summary.phone}</div>}
-              {(customer.email || summary.email) && <div style={{fontSize:14,color:'#1e293b'}}>✉️ {customer.email || summary.email}</div>}
-            </div>
-          )}
-
-          {/* Photos */}
-          {photos.length > 0 && (
-            <div style={{marginBottom:18}}>
-              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:10}}>Photos ({photos.length})</div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
-                {photos.map((p, i) => (
-                  <div key={i} style={{borderRadius:10,overflow:'hidden',background:'#f1f5f9'}}>
-                    <img src={p.url} alt={p.caption||`Photo ${i+1}`} style={{width:'100%',display:'block',objectFit:'cover',aspectRatio:'4/3'}} />
-                    {p.caption && <div style={{fontSize:11,color:'#64748b',padding:'4px 8px'}}>{p.caption}</div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Notes */}
-          {(data.notes || summary.notes) && (
-            <div style={{marginBottom:18}}>
-              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Notes</div>
-              <div style={{background:'#f8fafc',borderRadius:10,padding:'12px 14px',fontSize:14,color:'#1e293b',lineHeight:1.65,border:'1.5px solid #e2e8f0'}}>
-                {data.notes || summary.notes}
-              </div>
-            </div>
-          )}
-
-          {/* Materials */}
-          {materials.length > 0 && (
-            <div style={{marginBottom:18}}>
-              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Materials</div>
+              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Your System</div>
               <div style={{border:'1.5px solid #e2e8f0',borderRadius:10,overflow:'hidden'}}>
-                {materials.map((m, i) => (
-                  <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',borderBottom: i < materials.length-1 ? '1px solid #e2e8f0' : 'none',background: i%2===0 ? 'white' : '#f8fafc'}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:14,color:'#1e293b',fontWeight:600}}>{m.name}</div>
-                      <div style={{fontSize:12,color:'#64748b'}}>{m.qty} {m.unit} × ${Number(m.unitPrice).toLocaleString()}</div>
-                    </div>
-                    <div style={{fontSize:14,fontWeight:700,color:'#1a3a6b',flexShrink:0,marginLeft:12}}>${Number(m.total).toLocaleString()}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Labor */}
-          {labor.hours > 0 && (
-            <div style={{marginBottom:18}}>
-              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Labor</div>
-              <div style={{background:'#f8fafc',borderRadius:10,padding:'12px 14px',border:'1.5px solid #e2e8f0',display:'flex',justifyContent:'space-between'}}>
-                <div style={{fontSize:14,color:'#1e293b'}}>{labor.hours} hrs × ${labor.rate}/hr</div>
-                <div style={{fontSize:14,fontWeight:700,color:'#1a3a6b'}}>${Number(labor.total).toLocaleString()}</div>
-              </div>
-            </div>
-          )}
-
-          {/* New Install system info */}
-          {data.jobType === 'new_installation' && (system.pgp > 0 || system.mp > 0 || system.pro4 > 0 || system.drip > 0) && (
-            <div style={{marginBottom:18}}>
-              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>System Design</div>
-              <div style={{border:'1.5px solid #e2e8f0',borderRadius:10,overflow:'hidden'}}>
-                {[
-                  ['Hunter PGP-Ultra Rotary', system.pgp],
-                  ['Rotor Streamer (MP)', system.mp],
-                  ['Hunter Pro-4 Spray', system.pro4],
-                  ['Drip Zones', system.drip],
-                  ['# of Zones', system.zones],
-                  ['Valves', system.valves],
-                ].filter(([,v]) => v > 0).map(([label, val], i, arr) => (
+                {systemRows.map(([label, val], i, arr) => (
                   <div key={label} style={{display:'flex',justifyContent:'space-between',padding:'10px 14px',borderBottom: i < arr.length-1 ? '1px solid #e2e8f0' : 'none',background: i%2===0 ? 'white' : '#f8fafc'}}>
                     <div style={{fontSize:14,color:'#1e293b'}}>{label}</div>
                     <div style={{fontSize:14,fontWeight:700,color:'#1a3a6b'}}>{val}</div>
                   </div>
                 ))}
               </div>
-              {system.timer && <div style={{fontSize:13,color:'#64748b',marginTop:6}}>Timer: {system.timer}</div>}
+              {summary.addOnNotes && (
+                <div style={{fontSize:13,color:'#64748b',marginTop:8}}>Add-ons: {summary.addOnNotes}</div>
+              )}
             </div>
           )}
 
-          {/* Add-ons */}
-          {(addOns.sidewalk || addOns.other) && (
+          {/* Non-new-install: Notes */}
+          {!isNewInstall && summary.notes && (
             <div style={{marginBottom:18}}>
-              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Add-Ons</div>
-              {addOns.sidewalk && <div style={{fontSize:14,color:'#1e293b',marginBottom:4}}>Sidewalk Strip: {addOns.sidewalk}</div>}
-              {addOns.other    && <div style={{fontSize:14,color:'#1e293b'}}>Other: {addOns.other}</div>}
-            </div>
-          )}
-
-          {/* Totals */}
-          {(totals.grand || summary.total) && (
-            <div style={{background:'#1a3a6b',borderRadius:12,padding:'16px 18px'}}>
-              {totals.materials > 0 && (
-                <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-                  <div style={{fontSize:13,color:'rgba(255,255,255,0.7)'}}>Materials</div>
-                  <div style={{fontSize:13,color:'white'}}>${Number(totals.materials).toLocaleString()}</div>
-                </div>
-              )}
-              {totals.tax > 0 && (
-                <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-                  <div style={{fontSize:13,color:'rgba(255,255,255,0.7)'}}>Tax</div>
-                  <div style={{fontSize:13,color:'white'}}>${Number(totals.tax).toLocaleString()}</div>
-                </div>
-              )}
-              {totals.labor > 0 && (
-                <div style={{display:'flex',justifyContent:'space-between',marginBottom:10,paddingBottom:10,borderBottom:'1px solid rgba(255,255,255,0.2)'}}>
-                  <div style={{fontSize:13,color:'rgba(255,255,255,0.7)'}}>Labor</div>
-                  <div style={{fontSize:13,color:'white'}}>${Number(totals.labor).toLocaleString()}</div>
-                </div>
-              )}
-              <div style={{display:'flex',justifyContent:'space-between'}}>
-                <div style={{fontSize:16,fontWeight:700,color:'white'}}>Total</div>
-                <div style={{fontSize:18,fontWeight:700,color:'white'}}>${Number(totals.grand || summary.total || 0).toLocaleString()}</div>
+              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Notes</div>
+              <div style={{background:'#f8fafc',borderRadius:10,padding:'12px 14px',fontSize:14,color:'#1e293b',lineHeight:1.65,border:'1.5px solid #e2e8f0'}}>
+                {summary.notes}
               </div>
             </div>
           )}
+
+          {/* Total */}
+          {summary.total && Number(summary.total) > 0 && (
+            <div style={{background:'#1a3a6b',borderRadius:12,padding:'16px 18px'}}>
+              <div style={{display:'flex',justifyContent:'space-between'}}>
+                <div style={{fontSize:16,fontWeight:700,color:'white'}}>Total</div>
+                <div style={{fontSize:18,fontWeight:700,color:'white'}}>${Number(summary.total||0).toLocaleString()}</div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
 
