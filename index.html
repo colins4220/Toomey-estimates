@@ -1465,6 +1465,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
             firebaseId:      jobId,
             customerName:    customer.name,
             customerAddress: customer.address || '',
+            customerTown:    customer.town    || '',
             customerPhone:   customer.phone   || '',
             customerEmail:   customer.email   || '',
             preparedBy:      currentUser?.name  || '',
@@ -2593,6 +2594,7 @@ function App() {
   // Customer
   const [name,    setName]    = useState(draft.name    || "");
   const [address, setAddress] = useState(draft.address || "");
+  const [town,    setTown]    = useState(draft.town    || "");
   const [email,   setEmail]   = useState(draft.email   || "");
 
   // System
@@ -2655,8 +2657,8 @@ function App() {
 
   // Auto-save draft whenever state changes
   useEffect(() => {
-    saveDraft({ name, address, email, pgp, mp, pro4, drip, zones, valves, timer, price, priceOverride, notes, sidewalk, other });
-  }, [name, address, email, pgp, mp, pro4, drip, zones, valves, timer, price, priceOverride, notes, sidewalk, other]);
+    saveDraft({ name, address, town, email, pgp, mp, pro4, drip, zones, valves, timer, price, priceOverride, notes, sidewalk, other });
+  }, [name, address, town, email, pgp, mp, pro4, drip, zones, valves, timer, price, priceOverride, notes, sidewalk, other]);
 
   const canNext = [
     name.trim().length > 0 && address.trim().length > 0,
@@ -2668,7 +2670,7 @@ function App() {
   function reset() {
     clearDraft();
     setStep(0); setDone(false); setJobType(null); setSelectedCustomer(null);
-    setName(""); setAddress(""); setEmail("");
+    setName(""); setAddress(""); setTown(""); setEmail("");
     setPgp(0); setMp(0); setPro4(0);
     setDrip(0); setZones(0); setValves(0);
     setTimer(TIMER_OPTIONS[0]);
@@ -2691,6 +2693,7 @@ function App() {
     const estimateData = {
       customer_name: name,
       customer_address: address,
+      customer_town: town,
       customer_email: email,
       date: proposalDate,
       hunter_pgp_ultra: String(pgp),
@@ -2762,6 +2765,7 @@ function App() {
           firebaseId:      jobId,
           customerName:    name,
           customerAddress: address || '',
+          customerTown:    town   || '',
           customerPhone:   '',
           customerEmail:   email || '',
           preparedBy:      currentUser?.name || '',
@@ -3039,6 +3043,7 @@ function App() {
             if (jt === 'new_installation') {
               setName(queueCustomer.name || '');
               setAddress(queueCustomer.address || '');
+              setTown(queueCustomer.town || '');
               setEmail(queueCustomer.email || '');
             } else {
               setSelectedCustomer(queueCustomer);
@@ -3064,6 +3069,7 @@ function App() {
             if (customer.jobType === 'new_installation') {
               setName(customer.name || '');
               setAddress(customer.address || '');
+              setTown(customer.town || '');
               setEmail(customer.email || '');
             } else {
               setSelectedCustomer(customer);
@@ -3168,8 +3174,9 @@ function App() {
               <div className="section-sub">Appears on the proposal cover page.</div>
             </div>
             <Field label="Customer Name"            value={name}    onChange={setName}    placeholder="John & Jane Smith"                   icon="👤" />
-            <AddressField label="Property Address"  value={address} onChange={setAddress} placeholder="123 Oak Street, Lexington, MA 02420" icon="🏡" />
-            <Field label="Email Address (optional)" value={email}   onChange={setEmail}   placeholder="john@example.com"                    icon="✉️" type="email" />
+            <AddressField label="Street Address"     value={address} onChange={setAddress} placeholder="123 Oak Street" icon="🏡" />
+            <Field label="Town"                     value={town}    onChange={setTown}    placeholder="Lexington"         icon="📍" />
+            <Field label="Email Address (optional)" value={email}   onChange={setEmail}   placeholder="john@example.com" icon="✉️" type="email" />
             <div className="banner-date">
               <span style={{fontSize:22}}>📅</span>
               <div>
