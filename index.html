@@ -2043,11 +2043,25 @@ function EstimatesQueueScreen({ onBack, onStartEstimate }) {
 }
 
 // ── ProposalDetail ────────────────────────────────────────────────────────────
-function ProposalDetail({ summary, onBack }) {
+function ProposalDetail({ summary, onBack, onEdit }) {
   const TYPE_ICONS = { 'New Installation':'🌱','Re-Vamp':'🔧','Service Call':'🛠','System Recommendations':'💡' };
+  const JT_ID = { 'New Installation':'new_installation','Service Call':'service_call','Re-Vamp':'revamp','System Recommendations':'system_recommendations' };
 
-  const statusColor = summary.status === 'Accepted to be Scheduled' ? {bg:'#dcfce7',fg:'#16a34a'} : {bg:'#f1f5f9',fg:'#64748b'};
+  const [driveUrl,   setDriveUrl]   = useState('');
+  const [loadingPdf, setLoadingPdf] = useState(true);
+
+  const jobTypeId   = JT_ID[summary.jobType] || '';
   const isNewInstall = summary.jobType === 'New Installation';
+  const statusColor  = summary.status === 'Accepted to be Scheduled' ? {bg:'#dcfce7',fg:'#16a34a'} : {bg:'#f1f5f9',fg:'#64748b'};
+
+  useEffect(() => {
+    if (!summary.firebaseId || !jobTypeId) { setLoadingPdf(false); return; }
+    fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'get_proposal_pdf', firebaseId: summary.firebaseId, jobType: jobTypeId }) })
+      .then(r => r.json())
+      .then(d => setDriveUrl(d.driveUrl || ''))
+      .catch(() => {})
+      .finally(() => setLoadingPdf(false));
+  }, []);
 
   const systemRows = [
     ['Hunter PGP-Ultra Rotary', summary.pgp],
@@ -2105,8 +2119,8 @@ function ProposalDetail({ summary, onBack }) {
             </div>
           )}
 
-          {/* Non-new-install: Notes */}
-          {!isNewInstall && summary.notes && (
+          {/* Notes */}
+          {summary.notes && (
             <div style={{marginBottom:18}}>
               <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Notes</div>
               <div style={{background:'#f8fafc',borderRadius:10,padding:'12px 14px',fontSize:14,color:'#1e293b',lineHeight:1.65,border:'1.5px solid #e2e8f0'}}>
@@ -2117,12 +2131,31 @@ function ProposalDetail({ summary, onBack }) {
 
           {/* Total */}
           {summary.total && Number(summary.total) > 0 && (
-            <div style={{background:'#1a3a6b',borderRadius:12,padding:'16px 18px'}}>
+            <div style={{background:'#1a3a6b',borderRadius:12,padding:'16px 18px',marginBottom:16}}>
               <div style={{display:'flex',justifyContent:'space-between'}}>
                 <div style={{fontSize:16,fontWeight:700,color:'white'}}>Total</div>
                 <div style={{fontSize:18,fontWeight:700,color:'white'}}>${Number(summary.total||0).toLocaleString()}</div>
               </div>
             </div>
+          )}
+
+          {/* PDF actions */}
+          {loadingPdf && <div style={{textAlign:'center',padding:'10px',color:'#94a3b8',fontSize:13}}>Loading PDF link...</div>}
+          {!loadingPdf && driveUrl && (
+            <a href={driveUrl} target="_blank" rel="noreferrer"
+              style={{display:'block',textAlign:'center',padding:'13px',borderRadius:12,background:'#0f766e',color:'white',fontSize:15,fontWeight:700,textDecoration:'none',marginBottom:10,WebkitTapHighlightColor:'transparent'}}>
+              📄 View / Download PDF
+            </a>
+          )}
+          {!loadingPdf && !driveUrl && summary.firebaseId && (
+            <div style={{textAlign:'center',fontSize:13,color:'#94a3b8',marginBottom:10}}>PDF not available for this proposal</div>
+          )}
+          {isNewInstall && onEdit && (
+            <button
+              onClick={() => onEdit(summary)}
+              style={{width:'100%',padding:'13px',borderRadius:12,border:'2px solid #1a3a6b',background:'white',color:'#1a3a6b',fontSize:15,fontWeight:700,cursor:'pointer',WebkitTapHighlightColor:'transparent'}}>
+              ✏️ Edit &amp; Re-generate Proposal
+            </button>
           )}
 
         </div>
@@ -2136,7 +2169,7 @@ function ProposalDetail({ summary, onBack }) {
 }
 
 // ── PastProposalsScreen ───────────────────────────────────────────────────────
-function PastProposalsScreen({ onBack }) {
+function PastProposalsScreen({ onBack, onEdit }) {
   const [query,    setQuery]    = useState('');
   const [results,  setResults]  = useState([]);
   const [loading,  setLoading]  = useState(false);
@@ -2162,7 +2195,7 @@ function PastProposalsScreen({ onBack }) {
   function handleKey(e) { if (e.key === 'Enter') search(); }
 
   if (selected) {
-    return <ProposalDetail summary={selected} onBack={() => setSelected(null)} />;
+    return <ProposalDetail summary={selected} onBack={() => setSelected(null)} onEdit={onEdit} />;
   }
 
   return (
@@ -2972,7 +3005,22 @@ function App() {
 
   // ── Past Proposals screen ─────────────────────────────────────────────────────
   if (jobType === 'past_proposals') {
-    return <PastProposalsScreen onBack={() => setJobType(null)} />;
+    return <PastProposalsScreen onBack={() => setJobType(null)} onEdit={(summary) => {
+      setCurrentJobId(summary.firebaseId || null);
+      setName(summary.customerName || '');
+      setAddress(summary.address || '');
+      setTown(summary.town || '');
+      setEmail(summary.email || '');
+      setPgp(summary.pgp || 0);
+      setMp(summary.mp || 0);
+      setPro4(summary.pro4 || 0);
+      setDrip(summary.drip || 0);
+      setZones(summary.zones || 0);
+      setNotes(summary.notes || '');
+      setStep(0);
+      setDone(false);
+      setJobType('new_installation');
+    }} />;
   }
 
   // ── Dashboard screen ──────────────────────────────────────────────────────────
