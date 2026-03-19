@@ -1588,16 +1588,18 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
               {customer.address && <div className="customer-address">{customer.address}</div>}
               <div className="customer-date">Submitted by {currentUser?.name} · {today()}</div>
             </div>
-            <InnerCard title="💰 Summary">
-              <Row label="Materials" value={`$${fmt(matTotal)}`} />
-              {taxApplies && <Row label="MA Sales Tax (6.25%)" value={`$${fmt(taxTotal)}`} />}
-              <Row label="Labor" value={`$${fmt(laborTotal)}`} />
-            </InnerCard>
+            {!overrideApplies && (
+              <InnerCard title="💰 Summary">
+                <Row label="Materials" value={`$${fmt(matTotal)}`} />
+                {taxApplies && <Row label="MA Sales Tax (6.25%)" value={`$${fmt(taxTotal)}`} />}
+                <Row label="Labor" value={`$${fmt(laborTotal)}`} />
+              </InnerCard>
+            )}
             <div className="price-callout">
               <div>
                 <div className="price-label">Grand Total</div>
-                <div className="price-val">${fmt(grandTotal)}</div>
-                <div className="price-note">Materials + Labor</div>
+                <div className="price-val">${fmt(effectiveTotal)}</div>
+                <div className="price-note">{overrideApplies ? 'Price override applied' : 'Materials + Labor'}</div>
               </div>
               <span style={{fontSize:44}}>{jt.icon}</span>
             </div>
