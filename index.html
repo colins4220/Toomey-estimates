@@ -413,107 +413,57 @@ function clearDraft() {
 }
 
 // ── Customer storage ──────────────────────────────────────────────────────────
-const CUSTOMERS_KEY = 'toomey_customers';
+// ── Customer list (loaded from Google Sheet "Customers" tab) ─────────────────
+const CUSTOMER_LIST_CACHE_KEY = 'toomey_customer_list_v1';
+const CUSTOMER_LIST_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
-const SAMPLE_CUSTOMERS = [
-  { id:'c1', name:'Robert & Susan Johnson',  address:'47 Maple Street, Lexington, MA 02420',    email:'rjohnson@gmail.com',       phone:'781-555-0142' },
-  { id:'c2', name:'Michael Chen',             address:'12 Oak Ridge Road, Concord, MA 01742',    email:'mchen@outlook.com',        phone:'978-555-0218' },
-  { id:'c3', name:'Patricia Walsh',           address:'88 Birchwood Drive, Needham, MA 02492',   email:'pwalsh@gmail.com',         phone:'781-555-0367' },
-  { id:'c4', name:'David & Karen Murphy',     address:'203 Highland Ave, Winchester, MA 01890',  email:'dmurphy@yahoo.com',        phone:'781-555-0491' },
-  { id:'c5', name:'Thomas Brennan',           address:'15 Elm Court, Wellesley, MA 02481',       email:'tbrennan@gmail.com',       phone:'781-555-0523' },
-  { id:'c6', name:'Linda Fitzgerald',         address:'56 Pine Street, Weston, MA 02493',        email:'lfitzgerald@comcast.net',  phone:'781-555-0634' },
-  { id:'c7', name:"James & Mary O'Brien",     address:'91 Cedar Lane, Medfield, MA 02052',       email:'jobrien@gmail.com',        phone:'508-555-0712' },
-  { id:'c8', name:'William Donovan',          address:'34 Willow Way, Westwood, MA 02090',       email:'wdonovan@hotmail.com',     phone:'781-555-0856' },
-];
-
-function loadCustomers() {
+async function loadCustomerList() {
   try {
-    const stored = JSON.parse(localStorage.getItem(CUSTOMERS_KEY));
-    if (stored && stored.length > 0) return stored;
-    localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(SAMPLE_CUSTOMERS));
-    return SAMPLE_CUSTOMERS;
-  } catch { return SAMPLE_CUSTOMERS; }
-}
-
-function saveCustomers(list) {
-  try { localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(list)); } catch {}
-}
-
-function splitCSVRow(line) {
-  const result = []; let cur = ''; let inQ = false;
-  for (const ch of line) {
-    if (ch === '"') { inQ = !inQ; }
-    else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
-    else { cur += ch; }
-  }
-  result.push(cur.trim());
-  return result;
-}
-
-function parseAndMergeCSV(csvText, existing) {
-  const lines = csvText.trim().split('\n').filter(l => l.trim());
-  if (lines.length < 2) return { list: existing, added: 0, updated: 0, unchanged: 0 };
-
-  const headers = splitCSVRow(lines[0]).map(h => h.toLowerCase().replace(/['"]/g,''));
-  const col = (row, ...names) => {
-    for (const n of names) {
-      const i = headers.indexOf(n);
-      if (i !== -1 && row[i]) return row[i].replace(/^["']|["']$/g,'').trim();
+    const cached = JSON.parse(localStorage.getItem(CUSTOMER_LIST_CACHE_KEY) || '{}');
+    if (cached.items && cached.ts && (Date.now() - cached.ts) < CUSTOMER_LIST_CACHE_TTL) {
+      return cached.items;
     }
-    return '';
-  };
-
-  let added = 0, updated = 0, unchanged = 0;
-  const result = [...existing];
-
-  for (let i = 1; i < lines.length; i++) {
-    const row = splitCSVRow(lines[i]);
-    const incoming = {
-      name:    col(row, 'name', 'customer name', 'full name', 'customer'),
-      address: col(row, 'address', 'property address', 'street address'),
-      email:   col(row, 'email', 'email address'),
-      phone:   col(row, 'phone', 'phone number', 'telephone', 'cell', 'mobile'),
-    };
-    if (!incoming.name) continue;
-
-    const idx = result.findIndex(c =>
-      (incoming.email && c.email && c.email.toLowerCase() === incoming.email.toLowerCase()) ||
-      (c.name.toLowerCase() === incoming.name.toLowerCase() &&
-       c.address.toLowerCase() === incoming.address.toLowerCase())
-    );
-
-    if (idx === -1) {
-      result.push({ ...incoming, id: 'c' + Date.now() + i });
-      added++;
-    } else {
-      const changed = Object.keys(incoming).some(k => incoming[k] && result[idx][k] !== incoming[k]);
-      if (changed) {
-        result[idx] = { ...result[idx], ...Object.fromEntries(Object.entries(incoming).filter(([,v]) => v)) };
-        updated++;
-      } else { unchanged++; }
-    }
+  } catch(e) {}
+  try {
+    const resp = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'get_customer_list' })
+    });
+    const data = await resp.json();
+    const items = (data.customers || []).map((c, i) => ({ ...c, id: 'cust_' + i }));
+    try { localStorage.setItem(CUSTOMER_LIST_CACHE_KEY, JSON.stringify({ items, ts: Date.now() })); } catch(e) {}
+    return items;
+  } catch(e) {
+    console.warn('Customer list fetch failed:', e);
+    return [];
   }
-  return { list: result, added, updated, unchanged };
 }
 
-// ── Product catalog ───────────────────────────────────────────────────────────
-const SAMPLE_PRODUCTS = [
-  { id:'p1',  category:'Spray Heads',     name:'Hunter PGP-Ultra Rotary Head',  unit:'each', price: 18.00 },
-  { id:'p2',  category:'Spray Heads',     name:'Hunter Pro-4 Spray Head',       unit:'each', price: 12.00 },
-  { id:'p3',  category:'Spray Heads',     name:'MP Rotator Nozzle',             unit:'each', price:  8.50 },
-  { id:'p4',  category:'Valves',          name:'Irritrol 2400T Valve 1"',       unit:'each', price: 32.00 },
-  { id:'p5',  category:'Valves',          name:'Irritrol 2400T Valve 3/4"',     unit:'each', price: 28.00 },
-  { id:'p6',  category:'Controllers',     name:'Hunter Pro-C Controller',       unit:'each', price:185.00 },
-  { id:'p7',  category:'Controllers',     name:'Hunter HC WiFi 12-Station',     unit:'each', price:220.00 },
-  { id:'p8',  category:'Pipe & Fittings', name:'1" PVC Pipe (10ft)',            unit:'each', price:  6.50 },
-  { id:'p9',  category:'Pipe & Fittings', name:'3/4" PVC Pipe (10ft)',          unit:'each', price:  4.50 },
-  { id:'p10', category:'Pipe & Fittings', name:'1" Swing Joint',               unit:'each', price:  3.25 },
-  { id:'p11', category:'Backflow',        name:'Backflow Preventer 1"',         unit:'each', price:145.00 },
-  { id:'p12', category:'Drip',            name:'Drip Zone Kit',                 unit:'kit',  price: 85.00 },
-  { id:'p13', category:'Drip',            name:'1/2" Drip Tubing (100ft)',      unit:'roll', price: 22.00 },
-  { id:'p14', category:'Sensors',         name:'Hunter Rain Sensor',            unit:'each', price: 48.00 },
-  { id:'p15', category:'Sensors',         name:'Hunter Freeze Sensor',          unit:'each', price: 52.00 },
-];
+// ── Price list (loaded from Google Sheet "Price List" tab) ───────────────────
+const PRICE_LIST_CACHE_KEY = 'toomey_price_list_v1';
+const PRICE_LIST_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+async function loadPriceList() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(PRICE_LIST_CACHE_KEY) || '{}');
+    if (cached.items && cached.ts && (Date.now() - cached.ts) < PRICE_LIST_CACHE_TTL) {
+      return cached.items;
+    }
+  } catch(e) {}
+  try {
+    const resp = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'get_price_list' })
+    });
+    const data = await resp.json();
+    const items = (data.items || []).map((item, i) => ({ ...item, id: 'pl_' + i }));
+    try { localStorage.setItem(PRICE_LIST_CACHE_KEY, JSON.stringify({ items, ts: Date.now() })); } catch(e) {}
+    return items;
+  } catch(e) {
+    console.warn('Price list fetch failed:', e);
+    return [];
+  }
+}
 
 async function compressPhoto(file) {
   return new Promise(resolve => {
@@ -751,43 +701,22 @@ function InnerCard({ title, children }) {
 }
 
 // ── CustomerSelect ────────────────────────────────────────────────────────────
-function CustomerSelect({ jobType, onSelect, onBack }) {
+function CustomerSelect({ jobType, onSelect, onBack, customerList = [], customerListLoading = false }) {
   const jt = JOB_TYPES.find(j => j.id === jobType) || {};
-  const [query, setQuery]         = useState('');
-  const [customers, setCustomers] = useState(() => loadCustomers());
-  const [newMode, setNewMode]     = useState(false);
-  const [newC, setNewC]           = useState({ name:'', address:'', email:'', phone:'' });
-  const fileRef = useRef(null);
+  const [query, setQuery] = useState('');
+  const [newMode, setNewMode] = useState(false);
+  const [newC, setNewC]   = useState({ name:'', address:'', town:'', email:'', phone:'' });
 
-  const filtered = query.trim()
-    ? customers.filter(c =>
+  const filtered = query.trim().length >= 2
+    ? customerList.filter(c =>
         c.name.toLowerCase().includes(query.toLowerCase()) ||
-        c.address.toLowerCase().includes(query.toLowerCase()) ||
-        (c.email||'').toLowerCase().includes(query.toLowerCase()) ||
-        (c.phone||'').includes(query)
-      )
-    : customers;
-
-  function handleCSV(e) {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const r = parseAndMergeCSV(ev.target.result, customers);
-      saveCustomers(r.list);
-      setCustomers(r.list);
-      alert(`✅ Import complete!\n${r.added} added  •  ${r.updated} updated  •  ${r.unchanged} unchanged`);
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  }
+        (c.address||'').toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 40)
+    : [];
 
   function addNewCustomer() {
     if (!newC.name.trim() || !newC.address.trim()) { alert('Name and address are required.'); return; }
-    const c = { ...newC, id: 'c' + Date.now() };
-    const updated = [...customers, c];
-    saveCustomers(updated);
-    setCustomers(updated);
-    onSelect(c);
+    onSelect({ ...newC, id: 'new_' + Date.now() });
   }
 
   if (newMode) {
@@ -802,10 +731,11 @@ function CustomerSelect({ jobType, onSelect, onBack }) {
             <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.7)',textTransform:'uppercase',letterSpacing:'0.1em'}}>Enter Customer Details</div>
           </div>
           <div className="card-body">
-            <Field label="Customer Name"   value={newC.name}    onChange={v=>setNewC(p=>({...p,name:v}))}    placeholder="John & Jane Smith"                  icon="👤" />
-            <AddressField label="Address"  value={newC.address} onChange={v=>setNewC(p=>({...p,address:v}))} placeholder="123 Main St, Lexington, MA"          icon="🏡" />
-            <Field label="Email (optional)"value={newC.email}   onChange={v=>setNewC(p=>({...p,email:v}))}   placeholder="john@example.com" type="email"      icon="✉️" />
-            <Field label="Phone (optional)"value={newC.phone}   onChange={v=>setNewC(p=>({...p,phone:v}))}   placeholder="781-555-0000"                       icon="📞" />
+            <Field label="Customer Name"   value={newC.name}    onChange={v=>setNewC(p=>({...p,name:v}))}    placeholder="John & Jane Smith"         icon="👤" />
+            <AddressField label="Address"  value={newC.address} onChange={v=>setNewC(p=>({...p,address:v}))} placeholder="123 Main St"               icon="🏡" />
+            <Field label="Town"            value={newC.town}    onChange={v=>setNewC(p=>({...p,town:v}))}    placeholder="Lexington"                 icon="📍" />
+            <Field label="Email (optional)"value={newC.email}   onChange={v=>setNewC(p=>({...p,email:v}))}   placeholder="john@example.com" type="email" icon="✉️" />
+            <Field label="Phone (optional)"value={newC.phone}   onChange={v=>setNewC(p=>({...p,phone:v}))}   placeholder="781-555-0000"              icon="📞" />
           </div>
         </div>
         <div className="nav-bar">
@@ -829,21 +759,17 @@ function CustomerSelect({ jobType, onSelect, onBack }) {
           <input
             className="customer-search"
             type="text" value={query} onChange={e=>setQuery(e.target.value)}
-            placeholder="Search name, address, or email…"
+            placeholder="Search by name or address…"
             style={{width:'100%',padding:'11px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.3)',fontSize:16,background:'rgba(255,255,255,0.12)',color:'white',fontFamily:'inherit'}}
           />
-          <div style={{marginTop:10,display:'flex',alignItems:'center',gap:8}}>
-            <div style={{fontSize:12,color:'rgba(255,255,255,0.6)',flex:1}}>{filtered.length} customer{filtered.length!==1?'s':''}</div>
-            <button onClick={()=>fileRef.current?.click()} style={{padding:'6px 12px',borderRadius:8,border:'1.5px solid rgba(255,255,255,0.4)',background:'transparent',color:'white',fontSize:12,fontWeight:600,cursor:'pointer'}}>↑ Import CSV</button>
+          <div style={{marginTop:8,fontSize:12,color:'rgba(255,255,255,0.6)'}}>
+            {customerListLoading ? 'Loading customers…' : query.trim().length < 2 ? `${customerList.length.toLocaleString()} customers — type to search` : `${filtered.length} result${filtered.length!==1?'s':''}`}
           </div>
-          <input ref={fileRef} type="file" accept=".csv" style={{display:'none'}} onChange={handleCSV} />
         </div>
 
         <div style={{maxHeight:'52vh',overflowY:'auto'}}>
-          {filtered.length === 0 && (
-            <div style={{padding:'32px 22px',textAlign:'center',color:'#94a3b8',fontSize:14}}>
-              {query ? 'No customers match your search.' : 'No customers yet.'}
-            </div>
+          {!customerListLoading && query.trim().length >= 2 && filtered.length === 0 && (
+            <div style={{padding:'32px 22px',textAlign:'center',color:'#94a3b8',fontSize:14}}>No customers match your search.</div>
           )}
           {filtered.map((c,i) => (
             <div key={c.id||i} onClick={()=>onSelect(c)}
@@ -856,7 +782,7 @@ function CustomerSelect({ jobType, onSelect, onBack }) {
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontWeight:700,color:'#1a3a6b',fontSize:16,marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</div>
-                <div style={{fontSize:13,color:'#64748b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.address}</div>
+                <div style={{fontSize:13,color:'#64748b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.address}{c.town ? ', ' + c.town : ''}</div>
                 {c.phone && <div style={{fontSize:12,color:'#94a3b8',marginTop:1}}>{c.phone}</div>}
               </div>
               <div style={{color:'#94a3b8',fontSize:22,flexShrink:0}}>›</div>
@@ -870,7 +796,7 @@ function CustomerSelect({ jobType, onSelect, onBack }) {
             <div style={{width:42,height:42,borderRadius:12,background:'#f0fdf4',border:'2px dashed #10b981',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0,color:'#10b981'}}>+</div>
             <div>
               <div style={{fontWeight:700,color:'#10b981',fontSize:15}}>New Customer</div>
-              <div style={{fontSize:13,color:'#94a3b8'}}>Enter details manually</div>
+              <div style={{fontSize:13,color:'#94a3b8'}}>Not in the list? Enter manually</div>
             </div>
           </div>
         </div>
@@ -1363,7 +1289,7 @@ async function generateJobPDF(jobType, customer, photos, selectedItems, laborHou
 }
 
 // ── JobFlow ───────────────────────────────────────────────────────────────────
-function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex, onQueueComplete }) {
+function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex, onQueueComplete, priceList = [], priceListLoading = false }) {
   const jt = JOB_TYPES.find(j => j.id === jobType) || {};
   const STEPS = ['Photos', 'Materials', 'Review'];
   const [step, setStep]     = useState(0);
@@ -1428,9 +1354,9 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
   }
 
   // ── Materials ───────────────────────────────────────────────────────────────
-  const filteredProducts = matSearch.trim()
-    ? SAMPLE_PRODUCTS.filter(p => p.name.toLowerCase().includes(matSearch.toLowerCase()) || p.category.toLowerCase().includes(matSearch.toLowerCase()))
-    : SAMPLE_PRODUCTS;
+  const filteredProducts = matSearch.trim().length >= 2
+    ? priceList.filter(p => p.name.toLowerCase().includes(matSearch.toLowerCase())).slice(0, 60)
+    : [];
 
   function addProduct(product) {
     setSelectedItems(prev => {
@@ -1768,7 +1694,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
                   <div key={item.product.id} style={{display:'flex',alignItems:'center',gap:8,paddingBottom:10,borderBottom:'1px solid #f1f5f9',marginBottom:10}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:14,fontWeight:600,color:'#1a3a6b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.product.name}</div>
-                      <div style={{fontSize:12,color:'#64748b'}}>${item.product.price.toFixed(2)} / {item.product.unit}</div>
+                      <div style={{fontSize:12,color:'#64748b'}}>${item.product.price.toFixed(2)} each</div>
                     </div>
                     <div style={{display:'flex',alignItems:'center',gap:5,flexShrink:0}}>
                       <button onClick={()=>updateQty(item.product.id,item.qty-1)} style={{width:28,height:28,borderRadius:8,border:'1.5px solid #e2e8f0',background:'#f8fafc',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700}}>−</button>
@@ -1792,9 +1718,18 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
             )}
 
             <InnerCard title={jobType === 'system_recommendations' ? '💡 Add Recommended Products' : '🔍 Add Parts'}>
-              <input type="text" value={matSearch} onChange={e=>setMatSearch(e.target.value)} placeholder="Search parts by name or category…"
+              <input type="text" value={matSearch} onChange={e=>setMatSearch(e.target.value)} placeholder="Search by product name…"
                 style={{width:'100%',padding:'11px 14px',borderRadius:10,border:'1.5px solid #e2e8f0',fontSize:16,fontFamily:'inherit',marginBottom:10}}
               />
+              {priceListLoading && (
+                <div style={{textAlign:'center',padding:'16px',color:'#94a3b8',fontSize:13}}>Loading price list...</div>
+              )}
+              {!priceListLoading && priceList.length === 0 && (
+                <div style={{textAlign:'center',padding:'16px',color:'#dc2626',fontSize:13}}>Price list unavailable — check connection and try again.</div>
+              )}
+              {!priceListLoading && priceList.length > 0 && matSearch.trim().length < 2 && (
+                <div style={{textAlign:'center',padding:'14px',color:'#94a3b8',fontSize:13}}>{priceList.length} items — type to search</div>
+              )}
               <div style={{maxHeight:230,overflowY:'auto'}}>
                 {filteredProducts.map(p => {
                   const inCart = selectedItems.find(i => i.product.id === p.id);
@@ -1804,7 +1739,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
                     >
                       <div style={{minWidth:0}}>
                         <div style={{fontSize:14,fontWeight:600,color:'#1a3a6b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
-                        <div style={{fontSize:12,color:'#64748b'}}>{p.category} · ${p.price.toFixed(2)}/{p.unit}</div>
+                        <div style={{fontSize:12,color:'#64748b'}}>${p.price.toFixed(2)}</div>
                       </div>
                       <div style={{width:28,height:28,borderRadius:8,background:inCart?'#2563eb':'#e2e8f0',display:'flex',alignItems:'center',justifyContent:'center',color:inCart?'white':'#64748b',fontWeight:700,fontSize:15,flexShrink:0,marginLeft:8}}>
                         {inCart ? inCart.qty : '+'}
@@ -2528,6 +2463,21 @@ function App() {
     fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'get_queue' }) }).catch(() => {});
   }, []);
 
+  // Price list
+  const [priceList,        setPriceList]        = useState([]);
+  const [priceListLoading, setPriceListLoading] = useState(true);
+  useEffect(() => {
+    loadPriceList().then(items => { setPriceList(items); setPriceListLoading(false); });
+  }, []);
+
+  // Customer list
+  const [customerList,        setCustomerList]        = useState([]);
+  const [customerListLoading, setCustomerListLoading] = useState(true);
+  const [niCustSearch,        setNiCustSearch]        = useState('');
+  useEffect(() => {
+    loadCustomerList().then(items => { setCustomerList(items); setCustomerListLoading(false); });
+  }, []);
+
   const [step, setStep]       = useState(0);
   const [done, setDone]       = useState(false);
   const [loading, setLoading] = useState(false);
@@ -3063,6 +3013,8 @@ function App() {
           jobType={jobType}
           onSelect={c => setSelectedCustomer(c)}
           onBack={() => setJobType(null)}
+          customerList={customerList}
+          customerListLoading={customerListLoading}
         />
       );
     }
@@ -3075,6 +3027,8 @@ function App() {
           onHome={() => { setJobType(null); setSelectedCustomer(null); }}
           currentUser={currentUser}
           queueRowIndex={queueRowIndex}
+          priceList={priceList}
+          priceListLoading={priceListLoading}
           onQueueComplete={() => {
             if (queueRowIndex) {
               fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'update_queue_status', rowIndex: queueRowIndex, status:'Completed' }) }).catch(() => {});
@@ -3133,6 +3087,38 @@ function App() {
               <div className="section-title">Customer Information</div>
               <div className="section-sub">Appears on the proposal cover page.</div>
             </div>
+            {/* Existing customer search */}
+            {(() => {
+              const q = niCustSearch.trim();
+              const results = q.length >= 2
+                ? customerList.filter(c => c.name.toLowerCase().includes(q.toLowerCase()) || (c.address||'').toLowerCase().includes(q.toLowerCase())).slice(0, 20)
+                : [];
+              return (
+                <div style={{marginBottom:14}}>
+                  <input
+                    value={niCustSearch}
+                    onChange={e => setNiCustSearch(e.target.value)}
+                    placeholder="🔍 Find existing customer…"
+                    style={{width:'100%',padding:'11px 14px',borderRadius:10,border:'1.5px solid #e2e8f0',fontSize:15,fontFamily:'inherit',boxSizing:'border-box'}}
+                  />
+                  {results.length > 0 && (
+                    <div style={{border:'1.5px solid #e2e8f0',borderRadius:10,marginTop:4,maxHeight:180,overflowY:'auto',background:'white',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
+                      {results.map((c,i) => (
+                        <div key={c.id||i}
+                          onClick={() => { setName(c.name||''); setAddress(c.address||''); setTown(c.town||''); setEmail(c.email||''); setNiCustSearch(''); }}
+                          style={{padding:'10px 14px',borderBottom:'1px solid #f1f5f9',cursor:'pointer',WebkitTapHighlightColor:'transparent'}}
+                          onTouchStart={e=>e.currentTarget.style.background='#eff6ff'}
+                          onTouchEnd={e=>e.currentTarget.style.background='white'}
+                        >
+                          <div style={{fontSize:14,fontWeight:600,color:'#1a3a6b'}}>{c.name}</div>
+                          {c.address && <div style={{fontSize:12,color:'#64748b'}}>{c.address}{c.town?', '+c.town:''}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <Field label="Customer Name"            value={name}    onChange={setName}    placeholder="John & Jane Smith"                   icon="👤" />
             <AddressField label="Street Address"     value={address} onChange={setAddress} placeholder="123 Oak Street" icon="🏡" />
             <Field label="Town"                     value={town}    onChange={setTown}    placeholder="Lexington"         icon="📍" />

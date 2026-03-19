@@ -254,7 +254,7 @@
 
 <div class="steps">
   <div class="step"><div class="step-num">1</div><div class="step-text">Open the <strong>Estimates Queue</strong> tab in Google Sheets.</div></div>
-  <div class="step"><div class="step-num">2</div><div class="step-text">Add a new row with: <strong>Customer Name, Address, Phone, Email</strong> (if available), <strong>Scheduled Date</strong>, <strong>Job Type</strong>, and any <strong>Notes</strong> for the estimator.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Add a new row with: <strong>Customer Name, Address, Town, Phone, Email</strong> (if available), <strong>Scheduled Date</strong>, <strong>Job Type</strong>, and any <strong>Notes</strong> for the estimator.</div></div>
   <div class="step"><div class="step-num">3</div><div class="step-text">The row will appear in the estimator's app automatically within a few minutes. No other action needed.</div></div>
   <div class="step"><div class="step-num">4</div><div class="step-text">When the estimator completes the visit and submits from the app, the row is automatically removed from the queue and moved to the correct job tab (New Installs, Re-Vamps, etc.).</div></div>
 </div>
@@ -310,8 +310,9 @@
 
 <div class="steps">
   <div class="step"><div class="step-num">1</div><div class="step-text">Tap <strong>Estimates Queue</strong> on the home screen.</div></div>
-  <div class="step"><div class="step-num">2</div><div class="step-text">Find your customer's card and tap <strong>Start Estimate</strong>. The app will pre-fill their name, address, and job type automatically.</div></div>
-  <div class="step"><div class="step-num">3</div><div class="step-text">If the job type is already known (e.g. New Install), the app skips straight to the estimate screen. No extra tapping needed.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Find your customer's card and tap <strong>Start Estimate</strong>. The app pre-fills their name, address, town, phone, and email automatically.</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">If the job type is set in the queue (e.g. New Install), the app skips straight to the estimate screen. If the job type is blank or unrecognized, the app shows the home screen with the customer's name pre-filled — just tap the job type to continue.</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-text">When you submit the estimate, the row is <strong>automatically removed</strong> from the queue. You do not need to delete it manually.</div></div>
 </div>
 
 <h3>C. Starting a Walk-Up Estimate</h3>
@@ -327,14 +328,24 @@
 
 <h4>New Installation</h4>
 <ul>
-  <li>Enter head counts: PGP-Ultra Rotary, MP-Rotor, Pro-4 Spray — tap + / − or type the number directly.</li>
-  <li>Enter right-side values: Drip Zones, Number of Zones, Irritrol Valves, and select the controller (Hydrawise timer).</li>
-  <li>Enter the <strong>Price</strong>. Numbers only — no $ sign needed.</li>
+  <li>Enter head counts: PGP-Ultra Rotary, MP-Rotor, Pro-4 Spray — tap + / − to set quantities.</li>
+  <li>Enter zone details: Drip Zones, Number of Zones, Irritrol Valves, and select the controller.</li>
+  <li>The <strong>price is calculated automatically</strong> based on head counts and zones. You will see the auto-calculated price on the next screen.</li>
+  <li><strong>Price Override (optional):</strong> If you want to use a different price, type it in the Override Price field. Leave it blank to use the auto-calculated price. The proposal PDF will always show the final price you used.</li>
   <li>Add <strong>Notes</strong> if needed (these print on the proposal).</li>
   <li>Add-ons: Sidewalk Strip and Other (optional).</li>
 </ul>
 
-<h4>Re-Vamp, Service Call, System Recommendations</h4>
+<h4>Re-Vamp and System Recommendations</h4>
+<ul>
+  <li>Enter customer info, then select materials and labor from the item list.</li>
+  <li>Adjust quantities with + / −.</li>
+  <li>Add notes as needed.</li>
+  <li><strong>Price Override (optional):</strong> On the review screen, you can enter a custom total price. When set, the PDF will show item quantities only — no per-item pricing — and the grand total will reflect your override. Leave blank to use the calculated price.</li>
+  <li>A PDF is generated on your device (no internet required for this step).</li>
+</ul>
+
+<h4>Service Call</h4>
 <ul>
   <li>Enter customer info, then select materials and labor from the item list.</li>
   <li>Adjust quantities with + / −.</li>
@@ -393,9 +404,63 @@
 
 
 <!-- ══════════════════════════════════════════════
-     SECTION 6 — TROUBLESHOOTING
+     SECTION 6 — PAST PROPOSALS
 ══════════════════════════════════════════════ -->
-<h2>6. Common Issues</h2>
+<div class="page-break"></div>
+
+<h2>6. Past Proposals</h2>
+
+<p>The <strong>Past Proposals</strong> screen lets you look up any proposal that was previously submitted — new installs, re-vamps, service calls, or system recommendations.</p>
+
+<div class="steps">
+  <div class="step"><div class="step-num">1</div><div class="step-text">Tap <strong>Past Proposals</strong> on the home screen.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Type the customer's name or address and tap <strong>Search</strong>. Results appear from all job tabs in the Google Sheet.</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">Tap a result to view the full proposal detail — customer info, system specs (for new installs), notes, price, and status.</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-text">If a PDF was generated for that proposal, tap <strong>View / Download PDF</strong> to open it directly from Google Drive.</div></div>
+</div>
+
+<h3>Editing and Re-generating a New Install Proposal</h3>
+<p>If you need to update a New Installation proposal and re-generate the PDF:</p>
+
+<div class="steps">
+  <div class="step"><div class="step-num">1</div><div class="step-text">Find the proposal in Past Proposals and tap to open it.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Tap <strong>Edit &amp; Re-generate Proposal</strong>. The form reopens with the customer's information pre-filled.</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">Make your changes and tap through the steps to generate a new PDF and re-send if needed.</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-text">The existing Google Sheets record is updated — it does not create a duplicate row.</div></div>
+</div>
+
+<div class="box important">
+  <p><strong>Note:</strong> The Edit &amp; Re-generate button is only available for New Installation proposals. Re-Vamp, Service Call, and System Recommendation proposals can be viewed and downloaded but not edited in-app.</p>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     SECTION 7 — DASHBOARD
+══════════════════════════════════════════════ -->
+<h2>7. Dashboard</h2>
+
+<p>The <strong>Dashboard</strong> gives a quick summary of proposal activity over any time period.</p>
+
+<div class="steps">
+  <div class="step"><div class="step-num">1</div><div class="step-text">Tap <strong>Dashboard</strong> on the home screen (office/manager use).</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Select a time period: Today, 7 Days, Month, Year, or All Time.</div></div>
+</div>
+
+<p>The dashboard shows:</p>
+<ul>
+  <li><strong>New Installs:</strong> Total proposals sent, number accepted, total revenue from accepted proposals, close rate, and average job value.</li>
+  <li><strong>Service Calls:</strong> Total calls, resolved, and unresolved.</li>
+</ul>
+
+<div class="box">
+  <p>The dashboard pulls live data from Google Sheets. Give it a few seconds to load when you first open it.</p>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     SECTION 8 — TROUBLESHOOTING
+══════════════════════════════════════════════ -->
+<h2>8. Common Issues</h2>
 
 <table>
   <tr><th>Problem</th><th>What to Do</th></tr>
@@ -418,6 +483,18 @@
   <tr>
     <td>Email send fails</td>
     <td>Sign out and sign back in to re-enter your email password. If it continues to fail, download the PDF and email it manually from your email app.</td>
+  </tr>
+  <tr>
+    <td>Past Proposals search returns no results</td>
+    <td>Make sure you are connected to the internet. The search pulls live data from Google Sheets. Try a shorter search term (just the last name, or just the street name).</td>
+  </tr>
+  <tr>
+    <td>Past Proposal shows "PDF not available"</td>
+    <td>The proposal was submitted before PDFs were automatically saved to Drive, or the PDF save step failed at submission time. The data is still in Google Sheets — you can re-generate by tapping Edit &amp; Re-generate (New Installs only).</td>
+  </tr>
+  <tr>
+    <td>Dashboard shows zeros or won't load</td>
+    <td>Check your internet connection. The dashboard pulls live data from Google Sheets. If it still fails, check that the Apps Script is deployed and accessible.</td>
   </tr>
 </table>
 
