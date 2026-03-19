@@ -414,7 +414,7 @@ function clearDraft() {
 
 // ── Customer storage ──────────────────────────────────────────────────────────
 // ── Customer list (loaded from Google Sheet "Customers" tab) ─────────────────
-const CUSTOMER_LIST_CACHE_KEY = 'toomey_customer_list_v2';
+const CUSTOMER_LIST_CACHE_KEY = 'toomey_customer_list_v3';
 const CUSTOMER_LIST_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 async function loadCustomerList() {
@@ -431,7 +431,9 @@ async function loadCustomerList() {
     });
     const data = await resp.json();
     const items = (data.customers || []).map((c, i) => ({ ...c, id: 'cust_' + i }));
-    try { localStorage.setItem(CUSTOMER_LIST_CACHE_KEY, JSON.stringify({ items, ts: Date.now() })); } catch(e) {}
+    if (items.length > 0) {
+      try { localStorage.setItem(CUSTOMER_LIST_CACHE_KEY, JSON.stringify({ items, ts: Date.now() })); } catch(e) {}
+    }
     return items;
   } catch(e) {
     console.warn('Customer list fetch failed:', e);
