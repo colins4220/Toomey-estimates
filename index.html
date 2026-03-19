@@ -1922,7 +1922,7 @@ function EstimatesQueueScreen({ onBack, onStartEstimate }) {
 
   async function fetchQueue(attempt = 1) {
     try {
-      const r = await fetch(APPS_SCRIPT_URL + '?action=get_queue&t=' + Date.now());
+      const r = await fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'get_queue' }) });
       const data = await r.json();
       const q = data.queue || [];
       setQueue(q);
@@ -2150,7 +2150,7 @@ function PastProposalsScreen({ onBack }) {
     setLoading(true);
     setSearched(true);
     try {
-      const r = await fetch(APPS_SCRIPT_URL + '?action=search_proposals&query=' + encodeURIComponent(query.trim()));
+      const r = await fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'search_proposals', query: query.trim() }) });
       const data = await r.json();
       setResults(data.results || []);
     } catch(e) {
@@ -2256,11 +2256,11 @@ function DashboardScreen({ onBack }) {
   async function load(p) {
     setPreset(p); setLoading(true);
     const { start, end } = getRange(p);
-    let url = APPS_SCRIPT_URL + '?action=get_dashboard';
-    if (start) url += '&start=' + start;
-    if (end)   url += '&end='   + end;
+    const body = { action: 'get_dashboard' };
+    if (start) body.fromDate = start;
+    if (end)   body.toDate   = end;
     try {
-      const r = await fetch(url);
+      const r = await fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify(body) });
       const d = await r.json();
       setData(d);
     } catch(e) { setData(null); }
@@ -2269,11 +2269,12 @@ function DashboardScreen({ onBack }) {
 
   useEffect(() => { load('month'); }, []);
 
-  const ni = data?.newInstalls  || {};
-  const rv = data?.revamp       || {};
+  const niSent      = data?.newInstalls?.sent     || 0;
+  const niAccepted  = data?.newInstalls?.accepted || 0;
+  const niRevenue   = data?.newInstalls?.revenue  || 0;
+  const niCloseRate = niSent > 0 ? Math.round(niAccepted / niSent * 100) : 0;
+  const niAvgValue  = niAccepted > 0 ? Math.round(niRevenue / niAccepted) : 0;
   const sc = data?.serviceCalls || {};
-  const sr = data?.systemRecs   || {};
-  const ov = data?.overall      || {};
 
   const fmt$ = n => '$' + Math.round(n||0).toLocaleString();
 
@@ -2312,62 +2313,25 @@ function DashboardScreen({ onBack }) {
           {loading && <div style={{textAlign:'center',padding:40,color:'#64748b'}}>Loading...</div>}
 
           {!loading && data && (<>
-            {/* Overview */}
-            <div style={{fontSize:11,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Overview</div>
-            <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
-              <Stat label="Pipeline"  value={fmt$(ov.pipeline)}  color="#2563eb" />
-              <Stat label="Secured"   value={fmt$(ov.secured)}   color="#16a34a" />
-              <Stat label="Accept Rate" value={(ov.acceptanceRate||0)+'%'} color="#0f766e" />
-            </div>
-
             {/* New Installs */}
             <div style={{fontSize:11,fontWeight:700,color:'#1a3a6b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>🌱 New Installs</div>
             <div style={{display:'flex',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-              <Stat label="Leads"      value={ni.count||0}          color="#1a3a6b" />
-              <Stat label="Close Rate" value={(ni.closeRate||0)+'%'} color="#16a34a" />
-              <Stat label="Avg Value"  value={fmt$(ni.avgValue)}     color="#475569" />
+              <Stat label="Proposals Sent"     value={niSent}             color="#1a3a6b" />
+              <Stat label="Accepted"           value={niAccepted}         color="#16a34a" />
+              <Stat label="Close Rate"         value={niCloseRate + '%'}  color="#0f766e" />
             </div>
-            <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
-              <Stat label="Secured"  value={fmt$(ni.secured)}   color="#16a34a" />
-              <Stat label="Pipeline" value={fmt$(ni.pipeline)}  color="#2563eb" />
-              <Stat label="Avg Heads" value={ni.avgHeads||0}    color="#475569" />
+            <div style={{display:'flex',gap:8,marginBottom:20,flexWrap:'wrap'}}>
+              <Stat label="Total Revenue"  value={fmt$(niRevenue)}  color="#16a34a" />
+              <Stat label="Avg Job Value"  value={fmt$(niAvgValue)} color="#475569" />
             </div>
 
             {/* Service Calls */}
             <div style={{fontSize:11,fontWeight:700,color:'#0f766e',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>🛠 Service Calls</div>
             <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
-              <Stat label="Total"      value={sc.count||0}               color="#0f766e" />
-              <Stat label="Resolved"   value={sc.resolved||0}            color="#16a34a" />
-              <Stat label="Unresolved" value={sc.unresolved||0}          color="#dc2626" />
+              <Stat label="Total"      value={sc.total||0}      color="#0f766e" />
+              <Stat label="Resolved"   value={sc.resolved||0}   color="#16a34a" />
+              <Stat label="Unresolved" value={sc.unresolved||0} color="#dc2626" />
             </div>
-
-            {/* Re-Vamp + Sys Recs */}
-            <div style={{fontSize:11,fontWeight:700,color:'#0284c7',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>🔧 Re-Vamp &nbsp;·&nbsp; 💡 Sys Recs</div>
-            <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
-              <Stat label="Re-Vamp Count" value={rv.count||0}  color="#0284c7" />
-              <Stat label="Re-Vamp Value" value={fmt$(rv.total)} color="#0284c7" />
-              <Stat label="Sys Recs"      value={sr.count||0}  color="#6d28d9" />
-            </div>
-
-            {/* Leaderboard */}
-            {(ov.leaderboard||[]).length > 0 && (<>
-              <div style={{fontSize:11,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>🏆 Leaderboard</div>
-              <div style={{border:'1.5px solid #e2e8f0',borderRadius:12,overflow:'hidden',marginBottom:16}}>
-                {(ov.leaderboard||[]).map((p, i) => (
-                  <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderBottom: i<ov.leaderboard.length-1?'1px solid #f1f5f9':'none',background: i===0?'#fffbeb': i%2===0?'white':'#f8fafc'}}>
-                    <div style={{width:24,height:24,borderRadius:'50%',background: i===0?'#fbbf24':i===1?'#94a3b8':'#d97706',color:'white',fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{i+1}</div>
-                    <div style={{flex:1,fontSize:14,fontWeight:700,color:'#1a3a6b'}}>{p.name}</div>
-                    <div style={{fontSize:12,color:'#64748b'}}>{p.count} jobs</div>
-                    <div style={{fontSize:14,fontWeight:700,color:'#16a34a'}}>${Math.round(p.value).toLocaleString()}</div>
-                  </div>
-                ))}
-              </div>
-            </>)}
-
-            {/* Full dashboard link */}
-            <a href="dashboard.html" target="_blank"
-              style={{display:'block',textAlign:'center',padding:'12px',borderRadius:12,background:'#1a3a6b',color:'white',fontSize:15,fontWeight:700,textDecoration:'none',WebkitTapHighlightColor:'transparent'}}
-            >Open Full Dashboard (with Kanban) →</a>
           </>)}
 
           {!loading && !data && (
@@ -2501,7 +2465,7 @@ function App() {
 
   // Warm up Apps Script on load so first real request is fast
   useEffect(() => {
-    fetch(APPS_SCRIPT_URL + '?action=get_queue&t=' + Date.now()).catch(() => {});
+    fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'get_queue' }) }).catch(() => {});
   }, []);
 
   const [step, setStep]       = useState(0);
@@ -2701,7 +2665,7 @@ function App() {
       showToast('✅ Synced to Google Sheets');
     } catch(e) { console.warn('Sheets sync failed:', e); showToast('⚠️ Sheet sync failed — check connection', 'error'); }
     if (queueRowIndex) {
-      fetch(APPS_SCRIPT_URL + '?action=update_queue_status&row_index=' + queueRowIndex + '&status=Completed').catch(() => {});
+      fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'update_queue_status', rowIndex: queueRowIndex, status:'Completed' }) }).catch(() => {});
       setQueueRowIndex(null);
     }
   }
@@ -3038,7 +3002,7 @@ function App() {
           queueRowIndex={queueRowIndex}
           onQueueComplete={() => {
             if (queueRowIndex) {
-              fetch(APPS_SCRIPT_URL + '?action=update_queue_status&row_index=' + queueRowIndex + '&status=Completed').catch(() => {});
+              fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'update_queue_status', rowIndex: queueRowIndex, status:'Completed' }) }).catch(() => {});
               setQueueRowIndex(null);
             }
           }}
