@@ -1391,8 +1391,6 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
 
   // Price override (revamp + system_recommendations only)
   const [priceOverride, setPriceOverride] = useState('');
-  const overrideApplies = (jobType === 'revamp' || jobType === 'system_recommendations') && priceOverride.trim() !== '' && !isNaN(parseFloat(priceOverride));
-  const effectiveTotal  = overrideApplies ? parseFloat(priceOverride) : grandTotal;
 
   // PDF / Email
   const [sendStatus, setSendStatus] = useState('idle'); // idle|generating|ready|sending|sent|error
@@ -1409,6 +1407,8 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
   const taxTotal   = taxApplies ? matTotal * 0.0625 : 0;
   const laborTotal = laborHours * laborRate;
   const grandTotal = matTotal + taxTotal + laborTotal;
+  const overrideApplies = (jobType === 'revamp' || jobType === 'system_recommendations') && priceOverride.trim() !== '' && !isNaN(parseFloat(priceOverride));
+  const effectiveTotal  = overrideApplies ? parseFloat(priceOverride) : grandTotal;
 
   const fmt = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
