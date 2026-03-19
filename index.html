@@ -1158,7 +1158,7 @@ function PhotoMarkupModal({ photo, onSave, onCancel }) {
 }
 
 // ── PDF Generation ────────────────────────────────────────────────────────────
-async function generateJobPDF(jobType, customer, photos, selectedItems, laborHours, laborRate, laborTotal, matTotal, taxTotal, grandTotal, notes, currentUser) {
+async function generateJobPDF(jobType, customer, photos, selectedItems, laborHours, laborRate, laborTotal, matTotal, taxTotal, grandTotal, notes, currentUser, priceOverride) {
   if (!window.jspdf) throw new Error('jsPDF not loaded');
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
@@ -1258,10 +1258,12 @@ async function generateJobPDF(jobType, customer, photos, selectedItems, laborHou
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(100, 116, 139);
-    doc.text('Item',     M + 6,       y);
-    doc.text('Qty',      M + CW - 125, y, { align: 'center' });
-    doc.text('Unit $',   M + CW - 70,  y, { align: 'right' });
-    doc.text('Total',    M + CW,       y, { align: 'right' });
+    doc.text('Item', M + 6, y);
+    doc.text('Qty',  M + CW - 125, y, { align: 'center' });
+    if (!priceOverride) {
+      doc.text('Unit $', M + CW - 70, y, { align: 'right' });
+      doc.text('Total',  M + CW,      y, { align: 'right' });
+    }
     y += 10;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
@@ -1270,34 +1272,38 @@ async function generateJobPDF(jobType, customer, photos, selectedItems, laborHou
       doc.setTextColor(30, 30, 30);
       const nm = item.product.name.length > 44 ? item.product.name.slice(0, 44) + '…' : item.product.name;
       doc.text(nm, M + 6, y);
-      doc.text(String(item.qty),                          M + CW - 125, y, { align: 'center' });
-      doc.text(`$${item.product.price.toFixed(2)}`,       M + CW - 70,  y, { align: 'right' });
-      doc.text(`$${fmt(item.product.price * item.qty)}`,  M + CW,       y, { align: 'right' });
+      doc.text(String(item.qty), M + CW - 125, y, { align: 'center' });
+      if (!priceOverride) {
+        doc.text(`$${item.product.price.toFixed(2)}`,      M + CW - 70, y, { align: 'right' });
+        doc.text(`$${fmt(item.product.price * item.qty)}`, M + CW,      y, { align: 'right' });
+      }
       y += 5;
       doc.setDrawColor(226, 232, 240);
       doc.setLineWidth(0.5);
       doc.line(M, y, M + CW, y);
       y += 13;
     }
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(26, 58, 107);
-    doc.text('Materials Subtotal', M + CW - 145, y, { align: 'right' });
-    doc.text(`$${fmt(matTotal)}`, M + CW, y, { align: 'right' });
-    y += 16;
-    if (taxApplies) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.text('MA Sales Tax (6.25%)', M + CW - 145, y, { align: 'right' });
-      doc.text(`$${fmt(taxTotal)}`, M + CW, y, { align: 'right' });
+    if (!priceOverride) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(26, 58, 107);
+      doc.text('Materials Subtotal', M + CW - 145, y, { align: 'right' });
+      doc.text(`$${fmt(matTotal)}`, M + CW, y, { align: 'right' });
       y += 16;
+      if (taxApplies) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text('MA Sales Tax (6.25%)', M + CW - 145, y, { align: 'right' });
+        doc.text(`$${fmt(taxTotal)}`, M + CW, y, { align: 'right' });
+        y += 16;
+      }
     }
     y += 8;
   }
 
   // ── Labor ──
-  if (laborHours > 0) {
+  if (laborHours > 0 && !priceOverride) {
     checkPageBreak(60);
     sectionHeader('Labor');
     doc.setFont('helvetica', 'normal');
@@ -1325,6 +1331,7 @@ async function generateJobPDF(jobType, customer, photos, selectedItems, laborHou
   // ── Grand Total ──
   checkPageBreak(70);
   y += 8;
+  const displayTotal = priceOverride ? priceOverride : grandTotal;
   doc.setFillColor(26, 58, 107);
   doc.roundedRect(M, y, CW, 52, 6, 6, 'F');
   doc.setTextColor(255, 255, 255);
@@ -1333,7 +1340,7 @@ async function generateJobPDF(jobType, customer, photos, selectedItems, laborHou
   doc.text('GRAND TOTAL', W / 2, y + 17, { align: 'center' });
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(22);
-  doc.text(`$${fmt(grandTotal)}`, W / 2, y + 38, { align: 'center' });
+  doc.text(`$${fmt(Number(displayTotal))}`, W / 2, y + 38, { align: 'center' });
 
   // ── Footer on every page ──
   const pageCount = doc.internal.getNumberOfPages();
@@ -1381,6 +1388,11 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
 
   // Notes
   const [notes, setNotes] = useState('');
+
+  // Price override (revamp + system_recommendations only)
+  const [priceOverride, setPriceOverride] = useState('');
+  const overrideApplies = (jobType === 'revamp' || jobType === 'system_recommendations') && priceOverride.trim() !== '' && !isNaN(parseFloat(priceOverride));
+  const effectiveTotal  = overrideApplies ? parseFloat(priceOverride) : grandTotal;
 
   // PDF / Email
   const [sendStatus, setSendStatus] = useState('idle'); // idle|generating|ready|sending|sent|error
@@ -1472,7 +1484,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
             materialsTotal:  matTotal,
             tax:             taxTotal,
             laborTotal,
-            grandTotal,
+            grandTotal:      effectiveTotal,
             notes,
           })
         });
@@ -1494,7 +1506,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
       const { blobUrl, dataUrl } = await generateJobPDF(
         jobType, customer, photos, selectedItems,
         laborHours, laborRate, laborTotal, matTotal, taxTotal, grandTotal,
-        notes, currentUser
+        notes, currentUser, overrideApplies ? effectiveTotal : null
       );
       // Revoke any previous blob URL to free memory
       if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
@@ -1875,11 +1887,24 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
               />
             </InnerCard>
 
+            {(jobType === 'revamp' || jobType === 'system_recommendations') && (
+              <InnerCard title="💲 Price Override (optional)">
+                <div style={{fontSize:13,color:'#64748b',marginBottom:10}}>Leave blank to use the calculated price. If entered, the PDF will show item quantities only — no per-item pricing.</div>
+                <input
+                  type="number"
+                  value={priceOverride}
+                  onChange={e => setPriceOverride(e.target.value)}
+                  placeholder={`Calculated: $${fmt(grandTotal)}`}
+                  style={{width:'100%',padding:'12px 14px',borderRadius:10,border:'1.5px solid #e2e8f0',fontSize:16,fontFamily:'inherit',boxSizing:'border-box'}}
+                />
+              </InnerCard>
+            )}
+
             <div className="price-callout">
               <div>
                 <div className="price-label">Grand Total</div>
-                <div className="price-val">${fmt(grandTotal)}</div>
-                <div className="price-note">Materials + Labor</div>
+                <div className="price-val">${fmt(effectiveTotal)}</div>
+                <div className="price-note">{overrideApplies ? 'Price override applied' : 'Materials + Labor'}</div>
               </div>
               <span style={{fontSize:44}}>{jt.icon}</span>
             </div>
