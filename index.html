@@ -2345,9 +2345,15 @@ function DashboardScreen({ onBack }) {
 }
 
 // ── HomeScreen ────────────────────────────────────────────────────────────────
-function HomeScreen({ currentUser, queueCustomer, onSelect, onSwitchUser, onClearQueue }) {
+function HomeScreen({ currentUser, queueCustomer, onSelect, onSwitchUser, onClearQueue, updateAvailable }) {
   return (
     <div id="app-inner">
+      {updateAvailable && (
+        <div onClick={() => window.location.reload()}
+          style={{background:'#1a3a6b',color:'white',textAlign:'center',padding:'12px 16px',fontSize:14,fontWeight:600,cursor:'pointer',WebkitTapHighlightColor:'transparent'}}>
+          🔄 App update available — tap to refresh
+        </div>
+      )}
       <div className="brand">
         <div className="brand-icon"><img src="ToomeyLogo2026.png" style={{width:"100%",height:"100%",objectFit:"contain",borderRadius:8}} alt="" /></div>
         <div style={{flex:1}}>
@@ -2463,6 +2469,14 @@ function App() {
   // Warm up Apps Script on load so first real request is fast
   useEffect(() => {
     fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'get_queue' }) }).catch(() => {});
+  }, []);
+
+  // App update notification — only shown on home screen
+  const [updateAvailable, setUpdateAvailable] = useState(!!window.toomeyUpdatePending);
+  useEffect(() => {
+    const handler = () => setUpdateAvailable(true);
+    window.addEventListener('toomey-update-available', handler);
+    return () => window.removeEventListener('toomey-update-available', handler);
   }, []);
 
   // Price list
@@ -2950,6 +2964,7 @@ function App() {
           setJobType(jt);
         }}
         onSwitchUser={() => { clearUser(); setCurrentUser(null); }}
+        updateAvailable={updateAvailable}
       />
     );
   }
@@ -3271,15 +3286,10 @@ ReactDOM.createRoot(document.getElementById("app")).render(<App />);
 <script>
   const APP_VERSION = "2026.03.16.1";
 
-  // Show update banner when a new service worker is waiting
+  // Signal React that an update is available — only shown on home screen
   function showUpdateBanner() {
-    if (document.getElementById('update-banner')) return;
-    const banner = document.createElement('div');
-    banner.id = 'update-banner';
-    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#1a3a6b;color:white;text-align:center;padding:14px 16px;font-family:system-ui,sans-serif;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,0.3);';
-    banner.innerHTML = '🔄 App update available — tap here to refresh';
-    banner.onclick = () => window.location.reload();
-    document.body.appendChild(banner);
+    window.toomeyUpdatePending = true;
+    window.dispatchEvent(new CustomEvent('toomey-update-available'));
   }
 
   if ('serviceWorker' in navigator) {
