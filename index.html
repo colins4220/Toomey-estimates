@@ -1469,15 +1469,14 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
     setSendError('');
     try {
       const jt2 = JOB_TYPES.find(j => j.id === jobType) || {};
-      const filename = `Toomey_${customer.name.replace(/\s+/g,'_')}_${(jt2.label||jobType).replace(/\s+/g,'_')}.pdf`;
       const resp = await fetch('https://toomey-backend-production.up.railway.app/send-job-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pdf_base64:        pdfDataUrl.split(',')[1],
-          filename,
           to_email:          sendEmail.trim(),
           customer_name:     customer.name,
+          customer_address:  customer.address || '',
           job_type:          jobType,
           job_type_label:    jt2.label || jobType,
           firebase_id:       submittedJobId,
@@ -1570,7 +1569,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
                       style={{flex:1,padding:'11px 8px',textAlign:'center',background:'#eff6ff',border:'1.5px solid #2563eb',borderRadius:10,color:'#2563eb',fontWeight:700,fontSize:14,textDecoration:'none'}}>
                       👁 Preview
                     </a>
-                    <a href={pdfDataUrl} download={`Toomey_${customer.name.replace(/\s+/g,'_')}_${(jt.label||jobType).replace(/\s+/g,'_')}.pdf`}
+                    <a href={pdfDataUrl} download={`${(customer.name||'').trim().split(/\s+/).pop()}_${(customer.address||'').split(',')[0].trim().replace(/\s+/g,'_')}_${(jt.label||jobType).replace(/\s+/g,'_')}.pdf`}
                       style={{flex:1,padding:'11px 8px',textAlign:'center',background:'#f0fdf4',border:'1.5px solid #16a34a',borderRadius:10,color:'#16a34a',fontWeight:700,fontSize:14,textDecoration:'none'}}>
                       ⬇ Download
                     </a>
@@ -2740,9 +2739,9 @@ function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             pdf_base64:        niPdfBase64,
-            filename:          `Toomey_${name.replace(/\s+/g,'_')}_New_Install.pdf`,
             to_email:          email,
             customer_name:     name,
+            customer_address:  address || '',
             job_type:          'new_installation',
             job_type_label:    'New Installation',
             firebase_id:       currentJobId || '',
