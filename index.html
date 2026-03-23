@@ -326,6 +326,16 @@ window.TFB={
       console.warn('Storage upload failed, using base64 fallback:',e);
       return dataUrl;
     }
+  },
+  async uploadPdf(base64,path){
+    try{
+      const r=stRef(storage,path);
+      await uploadString(r,base64,'base64');
+      return await getDownloadURL(r);
+    }catch(e){
+      console.warn('PDF Storage upload failed:',e);
+      return null;
+    }
   }
 };
 </script>
@@ -1395,12 +1405,13 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
           preparedByEmail: currentUser?.email || '',
         }, jobId);
       }
-      // Sync to Google Sheets
+      // Sync directly to Google Sheets via Apps Script (no Railway middleman)
       try {
-        const sheetsResp = await fetch('https://toomey-backend-production.up.railway.app/sync-to-sheets', {
+        const sheetsResp = await fetch(APPS_SCRIPT_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            action:          'submit_proposal',
             jobType,
             firebaseId:      jobId,
             customerName:    customer.name,
@@ -1419,8 +1430,9 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
         const sheetsResult = await sheetsResp.json();
         if (sheetsResult.accept_url) setAcceptUrl(sheetsResult.accept_url);
         showToast('✅ Synced to Google Sheets');
+        // Only remove from queue after Sheets sync succeeds
+        if (queueRowIndex && onQueueComplete) { onQueueComplete(); }
       } catch(e) { console.warn('Sheets sync failed:', e); showToast('⚠️ Sheet sync failed — check connection', 'error'); }
-      if (queueRowIndex && onQueueComplete) { onQueueComplete(); }
     } catch(e) { console.error('Submit error:', e); }
     setSaving(false);
     setDone(true);
@@ -1555,11 +1567,11 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
               {pdfReady && (
                 <>
                   <div style={{display:'flex',gap:8,marginBottom:14}}>
-                    <a href={pdfBlobUrl} target="_blank" rel="noreferrer"
+                    <a href={pdfDataUrl} target="_blank" rel="noreferrer"
                       style={{flex:1,padding:'11px 8px',textAlign:'center',background:'#eff6ff',border:'1.5px solid #2563eb',borderRadius:10,color:'#2563eb',fontWeight:700,fontSize:14,textDecoration:'none'}}>
                       👁 Preview
                     </a>
-                    <a href={pdfBlobUrl} download={`Toomey_${customer.name.replace(/\s+/g,'_')}_${(jt.label||jobType).replace(/\s+/g,'_')}.pdf`}
+                    <a href={pdfDataUrl} download={`Toomey_${customer.name.replace(/\s+/g,'_')}_${(jt.label||jobType).replace(/\s+/g,'_')}.pdf`}
                       style={{flex:1,padding:'11px 8px',textAlign:'center',background:'#f0fdf4',border:'1.5px solid #16a34a',borderRadius:10,color:'#16a34a',fontWeight:700,fontSize:14,textDecoration:'none'}}>
                       ⬇ Download
                     </a>
@@ -2466,9 +2478,10 @@ function App() {
   const draft = loadDraft();
   const [currentUser, setCurrentUser] = useState(loadUser());
 
-  // Warm up Apps Script on load so first real request is fast
+  // Warm up Apps Script and Railway on load so first real requests are fast
   useEffect(() => {
     fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'get_queue' }) }).catch(() => {});
+    fetch('https://toomey-backend-production.up.railway.app/health').catch(() => {});
   }, []);
 
   // App update notification — only shown on home screen
@@ -2587,9 +2600,13 @@ function App() {
     setTimer(TIMER_OPTIONS[0]);
     setPrice(""); setPriceOverride(""); setNotes(""); setSidewalk(""); setOther("");
     setCurrentJobId(null);
+    setNiPdfBase64(null);
+    setNiPdfStorageUrl(null);
   }
 
   const [pdfId, setPdfId] = useState(null);
+  const [niPdfBase64, setNiPdfBase64] = useState(null);
+  const [niPdfStorageUrl, setNiPdfStorageUrl] = useState(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [customMessage, setCustomMessage] = useState("");
   const [currentJobId, setCurrentJobId] = useState(null);
@@ -2626,27 +2643,36 @@ function App() {
     };
     
     try {
-      // Replace with your Render URL after deployment
       const BACKEND_URL = 'https://toomey-backend-production.up.railway.app';
-      
+
       const response = await fetch(`${BACKEND_URL}/generate-pdf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(estimateData)
       });
-      
+
       const result = await response.json();
-      
+
       if (result.success) {
         setPdfId(result.pdf_id);
+        // Upload PDF to Firebase Storage for a permanent preview URL
+        if (result.pdf_base64 && window.TFB) {
+          const storageUrl = await window.TFB.uploadPdf(result.pdf_base64, `proposals/${jobId}.pdf`);
+          if (storageUrl) setNiPdfStorageUrl(storageUrl);
+        }
+        setNiPdfBase64(result.pdf_base64 || null);
       } else {
         alert('Failed to generate PDF: ' + (result.error || 'Unknown error'));
+        setLoading(false);
+        return;
       }
     } catch (err) {
       console.error('PDF generation failed:', err);
-      alert('Failed to connect to PDF generator. Please check your connection.');
+      alert('Could not reach the PDF server. Please check your connection and try again.');
+      setLoading(false);
+      return;
     }
-    
+
     setLoading(false);
     setDone(true);
 
@@ -2665,13 +2691,14 @@ function App() {
       }, jobId);
     }
 
-    // Sync to Google Sheets
+    // Sync directly to Google Sheets via Apps Script (no Railway middleman)
     try {
       const rawPrice = String(displayPrice).replace(/,/g,'');
-      const syncResp = await fetch('https://toomey-backend-production.up.railway.app/sync-to-sheets', {
+      const syncResp = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action:          'submit_proposal',
           jobType:         'new_installation',
           firebaseId:      jobId,
           customerName:    name,
@@ -2689,26 +2716,52 @@ function App() {
       const syncResult = await syncResp.json().catch(() => ({}));
       if (syncResult.accept_url) setInstallAcceptUrl(syncResult.accept_url);
       showToast('✅ Synced to Google Sheets');
+      // Only delete the queue row after a successful Sheets sync
+      if (queueRowIndex) {
+        fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'update_queue_status', rowIndex: queueRowIndex, status:'Completed' }) }).catch(() => {});
+        setQueueRowIndex(null);
+      }
     } catch(e) { console.warn('Sheets sync failed:', e); showToast('⚠️ Sheet sync failed — check connection', 'error'); }
-    if (queueRowIndex) {
-      fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'update_queue_status', rowIndex: queueRowIndex, status:'Completed' }) }).catch(() => {});
-      setQueueRowIndex(null);
-    }
   }
 
   async function sendToClient() {
-    if (!pdfId) return;
-    
+    if (!niPdfBase64 && !pdfId) return;
+
     setSendingEmail(true);
-    
+
     try {
       const BACKEND_URL = 'https://toomey-backend-production.up.railway.app';
+      let response;
 
-      const response = await fetch(`${BACKEND_URL}/send-pdf/${pdfId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: customMessage.trim(), accept_url: installAcceptUrl || '' })
-      });
+      if (niPdfBase64) {
+        // Preferred path: send base64 directly — does not depend on Railway temp storage
+        response = await fetch(`${BACKEND_URL}/send-job-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pdf_base64:        niPdfBase64,
+            filename:          `Toomey_${name.replace(/\s+/g,'_')}_New_Install.pdf`,
+            to_email:          email,
+            customer_name:     name,
+            job_type:          'new_installation',
+            job_type_label:    'New Installation',
+            firebase_id:       currentJobId || '',
+            prepared_by_name:  currentUser?.name  || '',
+            prepared_by_email: currentUser?.email || '',
+            smtp_password:     currentUser?.smtp_password || '',
+            message:           customMessage.trim(),
+            cc_office:         true,
+            accept_url:        installAcceptUrl || '',
+          })
+        });
+      } else {
+        // Fallback: use the pdfId stored on Railway (may fail if Railway restarted)
+        response = await fetch(`${BACKEND_URL}/send-pdf/${pdfId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: customMessage.trim(), accept_url: installAcceptUrl || '' })
+        });
+      }
 
       const text = await response.text();
       let result;
@@ -2724,7 +2777,7 @@ function App() {
     } catch (err) {
       alert('Network error: ' + err.message);
     }
-    
+
     setSendingEmail(false);
   }
 
@@ -2788,11 +2841,11 @@ function App() {
             </div>
 
             {/* Preview & Send buttons */}
-            {pdfId ? (
+            {(niPdfStorageUrl || pdfId) ? (
               <div style={{display:'flex',flexDirection:'column',gap:12}}>
                 <div style={{display:'flex',gap:10}}>
                   <a
-                    href={`https://toomey-backend-production.up.railway.app/preview-pdf/${pdfId}`}
+                    href={niPdfStorageUrl || `https://toomey-backend-production.up.railway.app/preview-pdf/${pdfId}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
@@ -2805,7 +2858,7 @@ function App() {
                     📄 Preview
                   </a>
                   <a
-                    href={`https://toomey-backend-production.up.railway.app/download-pdf/${pdfId}`}
+                    href={niPdfStorageUrl || `https://toomey-backend-production.up.railway.app/download-pdf/${pdfId}`}
                     download
                     style={{
                       flex:1,display:'block',padding:'16px 10px',borderRadius:14,
