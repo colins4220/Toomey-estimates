@@ -1409,7 +1409,6 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
       try {
         const sheetsResp = await fetch(APPS_SCRIPT_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action:          'submit_proposal',
             jobType,
@@ -1427,7 +1426,7 @@ function JobFlow({ jobType, customer, onBack, onHome, currentUser, queueRowIndex
             notes,
           })
         });
-        const sheetsResult = await sheetsResp.json();
+        const sheetsResult = await sheetsResp.json().catch(() => ({}));
         if (sheetsResult.accept_url) setAcceptUrl(sheetsResult.accept_url);
         showToast('✅ Synced to Google Sheets');
         // Only remove from queue after Sheets sync succeeds
@@ -2696,7 +2695,6 @@ function App() {
       const rawPrice = String(displayPrice).replace(/,/g,'');
       const syncResp = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action:          'submit_proposal',
           jobType:         'new_installation',
