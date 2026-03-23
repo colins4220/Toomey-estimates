@@ -2660,6 +2660,8 @@ function App() {
           if (storageUrl) setNiPdfStorageUrl(storageUrl);
         }
         setNiPdfBase64(result.pdf_base64 || null);
+        // Drive URL is returned immediately at generate time (not just after send)
+        if (result.drive_url) setInstallDriveUrl(result.drive_url);
       } else {
         alert('Failed to generate PDF: ' + (result.error || 'Unknown error'));
         setLoading(false);
