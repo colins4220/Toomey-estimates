@@ -2062,7 +2062,9 @@ function ProposalDetail({ summary, onBack, onEdit }) {
   const fbLabor     = fbData?.labor   || {};
   const fbNotes     = fbData?.notes   || summary.notes || '';
   const hasLineItems = !isNewInstall && fbMaterials.length > 0;
-  const displayTotal = fbTotals.grand || fbTotals.materials || Number(summary.total) || 0;
+  const displayTotal = fbData != null
+    ? (fbTotals.grand != null ? Number(fbTotals.grand) : Number(summary.total) || 0)
+    : (Number(summary.total) || 0);
 
   return (
     <div id="app-inner">
