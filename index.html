@@ -2020,23 +2020,34 @@ function EstimatesQueueScreen({ onBack, onStartEstimate }) {
 function ProposalDetail({ summary, onBack, onEdit }) {
   const TYPE_ICONS = { 'New Installation':'🌱','Re-Vamp':'🔧','Service Call':'🛠','System Recommendations':'💡' };
   const JT_ID = { 'New Installation':'new_installation','Service Call':'service_call','Re-Vamp':'revamp','System Recommendations':'system_recommendations' };
+  const fmt = n => Number(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 
-  const [driveUrl,   setDriveUrl]   = useState('');
-  const [loadingPdf, setLoadingPdf] = useState(true);
+  const [driveUrl,    setDriveUrl]    = useState('');
+  const [loadingPdf,  setLoadingPdf]  = useState(true);
+  const [fbData,      setFbData]      = useState(null);
 
-  const jobTypeId   = JT_ID[summary.jobType] || '';
+  const jobTypeId    = JT_ID[summary.jobType] || '';
   const isNewInstall = summary.jobType === 'New Installation';
   const statusColor  = summary.status === 'Accepted to be Scheduled' ? {bg:'#dcfce7',fg:'#16a34a'} : {bg:'#f1f5f9',fg:'#64748b'};
 
   useEffect(() => {
-    if (!summary.firebaseId || !jobTypeId) { setLoadingPdf(false); return; }
-    fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'get_proposal_pdf', firebaseId: summary.firebaseId, jobType: jobTypeId }) })
-      .then(r => r.json())
-      .then(d => setDriveUrl(d.driveUrl || ''))
-      .catch(() => {})
-      .finally(() => setLoadingPdf(false));
+    // Load Drive URL and full Firebase data in parallel
+    if (summary.firebaseId) {
+      fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'get_proposal_pdf', firebaseId: summary.firebaseId, jobType: jobTypeId }) })
+        .then(r => r.json())
+        .then(d => setDriveUrl(d.driveUrl || ''))
+        .catch(() => {})
+        .finally(() => setLoadingPdf(false));
+
+      if (window.TFB) {
+        window.TFB.getById(summary.firebaseId).then(d => { if (d) setFbData(d); });
+      }
+    } else {
+      setLoadingPdf(false);
+    }
   }, []);
 
+  // For New Install: system row data comes from summary (from Sheets)
   const systemRows = [
     ['Hunter PGP-Ultra Rotary', summary.pgp],
     ['Rotor Streamer (MP)',      summary.mp],
@@ -2044,6 +2055,14 @@ function ProposalDetail({ summary, onBack, onEdit }) {
     ['Drip Zones',               summary.drip],
     ['# of Zones',               summary.zones],
   ].filter(([, v]) => Number(v) > 0);
+
+  // For SC/Revamp/SysRec: line items and totals from Firebase
+  const fbMaterials = fbData?.materials || [];
+  const fbTotals    = fbData?.totals || {};
+  const fbLabor     = fbData?.labor   || {};
+  const fbNotes     = fbData?.notes   || summary.notes || '';
+  const hasLineItems = !isNewInstall && fbMaterials.length > 0;
+  const displayTotal = fbTotals.grand || fbTotals.materials || Number(summary.total) || 0;
 
   return (
     <div id="app-inner">
@@ -2075,6 +2094,20 @@ function ProposalDetail({ summary, onBack, onEdit }) {
 
         <div className="card-body">
 
+          {/* PDF — primary action, shown at top */}
+          {loadingPdf && <div style={{textAlign:'center',padding:'10px',color:'#94a3b8',fontSize:13}}>Loading PDF...</div>}
+          {!loadingPdf && driveUrl && (
+            <a href={driveUrl} target="_blank" rel="noreferrer"
+              style={{display:'block',textAlign:'center',padding:'15px',borderRadius:12,background:'linear-gradient(135deg,#0f766e,#0d9488)',color:'white',fontSize:16,fontWeight:700,textDecoration:'none',marginBottom:18,boxShadow:'0 4px 14px rgba(15,118,110,0.35)',WebkitTapHighlightColor:'transparent'}}>
+              📄 View Proposal PDF (as sent to client)
+            </a>
+          )}
+          {!loadingPdf && !driveUrl && summary.firebaseId && (
+            <div style={{background:'#fef3c7',border:'1.5px solid #f59e0b',borderRadius:10,padding:'10px 14px',fontSize:13,color:'#92400e',marginBottom:18,textAlign:'center'}}>
+              PDF not saved to Drive for this proposal
+            </div>
+          )}
+
           {/* New Install: Your System */}
           {isNewInstall && systemRows.length > 0 && (
             <div style={{marginBottom:18}}>
@@ -2093,18 +2126,56 @@ function ProposalDetail({ summary, onBack, onEdit }) {
             </div>
           )}
 
-          {/* Notes */}
-          {summary.notes && (
+          {/* SC / Revamp / SysRec: Materials line items from Firebase */}
+          {hasLineItems && (
             <div style={{marginBottom:18}}>
-              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Notes</div>
-              <div style={{background:'#f8fafc',borderRadius:10,padding:'12px 14px',fontSize:14,color:'#1e293b',lineHeight:1.65,border:'1.5px solid #e2e8f0'}}>
-                {summary.notes}
+              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Materials</div>
+              <div style={{border:'1.5px solid #e2e8f0',borderRadius:10,overflow:'hidden'}}>
+                {fbMaterials.map((item, i) => (
+                  <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',borderBottom: i < fbMaterials.length-1 ? '1px solid #e2e8f0' : 'none',background: i%2===0 ? 'white' : '#f8fafc'}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,color:'#1e293b',fontWeight:600}}>{item.name}</div>
+                      <div style={{fontSize:12,color:'#64748b'}}>{item.qty} {item.unit} @ ${fmt(item.unitPrice)}</div>
+                    </div>
+                    <div style={{fontSize:14,fontWeight:700,color:'#1a3a6b',marginLeft:12,flexShrink:0}}>${fmt(item.total)}</div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Total */}
-          {summary.total && Number(summary.total) > 0 && (
+          {/* SC / Revamp / SysRec: Totals breakdown from Firebase */}
+          {!isNewInstall && fbData && (
+            <div style={{marginBottom:18}}>
+              <div style={{border:'1.5px solid #e2e8f0',borderRadius:10,overflow:'hidden'}}>
+                {fbTotals.materials > 0 && (
+                  <div style={{display:'flex',justifyContent:'space-between',padding:'10px 14px',borderBottom:'1px solid #e2e8f0',background:'white'}}>
+                    <div style={{fontSize:14,color:'#64748b'}}>Materials</div>
+                    <div style={{fontSize:14,fontWeight:600,color:'#1e293b'}}>${fmt(fbTotals.materials)}</div>
+                  </div>
+                )}
+                {fbTotals.tax > 0 && (
+                  <div style={{display:'flex',justifyContent:'space-between',padding:'10px 14px',borderBottom:'1px solid #e2e8f0',background:'#f8fafc'}}>
+                    <div style={{fontSize:14,color:'#64748b'}}>MA Sales Tax (6.25%)</div>
+                    <div style={{fontSize:14,fontWeight:600,color:'#1e293b'}}>${fmt(fbTotals.tax)}</div>
+                  </div>
+                )}
+                {fbLabor && fbLabor.total > 0 && (
+                  <div style={{display:'flex',justifyContent:'space-between',padding:'10px 14px',borderBottom:'1px solid #e2e8f0',background:'white'}}>
+                    <div style={{fontSize:14,color:'#64748b'}}>Labor ({fbLabor.hours} hr{fbLabor.hours!==1?'s':''} @ ${fbLabor.rate}/hr)</div>
+                    <div style={{fontSize:14,fontWeight:600,color:'#1e293b'}}>${fmt(fbLabor.total)}</div>
+                  </div>
+                )}
+                <div style={{display:'flex',justifyContent:'space-between',padding:'12px 14px',background:'#1a3a6b'}}>
+                  <div style={{fontSize:15,fontWeight:700,color:'white'}}>Total</div>
+                  <div style={{fontSize:16,fontWeight:700,color:'white'}}>${fmt(displayTotal)}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* New Install total (from Sheets) */}
+          {isNewInstall && summary.total && Number(summary.total) > 0 && (
             <div style={{background:'#1a3a6b',borderRadius:12,padding:'16px 18px',marginBottom:16}}>
               <div style={{display:'flex',justifyContent:'space-between'}}>
                 <div style={{fontSize:16,fontWeight:700,color:'white'}}>Total</div>
@@ -2113,17 +2184,16 @@ function ProposalDetail({ summary, onBack, onEdit }) {
             </div>
           )}
 
-          {/* PDF actions */}
-          {loadingPdf && <div style={{textAlign:'center',padding:'10px',color:'#94a3b8',fontSize:13}}>Loading PDF link...</div>}
-          {!loadingPdf && driveUrl && (
-            <a href={driveUrl} target="_blank" rel="noreferrer"
-              style={{display:'block',textAlign:'center',padding:'13px',borderRadius:12,background:'#0f766e',color:'white',fontSize:15,fontWeight:700,textDecoration:'none',marginBottom:10,WebkitTapHighlightColor:'transparent'}}>
-              📄 View / Download PDF
-            </a>
+          {/* Notes */}
+          {fbNotes && (
+            <div style={{marginBottom:18}}>
+              <div style={{fontSize:12,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Notes</div>
+              <div style={{background:'#f8fafc',borderRadius:10,padding:'12px 14px',fontSize:14,color:'#1e293b',lineHeight:1.65,border:'1.5px solid #e2e8f0'}}>
+                {fbNotes}
+              </div>
+            </div>
           )}
-          {!loadingPdf && !driveUrl && summary.firebaseId && (
-            <div style={{textAlign:'center',fontSize:13,color:'#94a3b8',marginBottom:10}}>PDF not available for this proposal</div>
-          )}
+
           {isNewInstall && onEdit && (
             <button
               onClick={() => onEdit(summary)}
