@@ -2605,6 +2605,8 @@ function App() {
   const [pdfId, setPdfId] = useState(null);
   const [niPdfBase64, setNiPdfBase64] = useState(null);
   const [niPdfStorageUrl, setNiPdfStorageUrl] = useState(null);
+  const [niStorageUploadFailed, setNiStorageUploadFailed] = useState(false);
+  const [retryingUpload, setRetryingUpload] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [customMessage, setCustomMessage] = useState("");
   const [currentJobId, setCurrentJobId] = useState(null);
@@ -2653,14 +2655,17 @@ function App() {
 
       if (result.success) {
         setPdfId(result.pdf_id);
-        // Upload PDF to Firebase Storage for a permanent preview URL
+        // Upload PDF to Firebase Storage for a permanent preview URL (works on iPad)
         if (result.pdf_base64 && window.TFB) {
           const storageUrl = await window.TFB.uploadPdf(result.pdf_base64, `proposals/${jobId}.pdf`);
-          if (storageUrl) setNiPdfStorageUrl(storageUrl);
+          if (storageUrl) {
+            setNiPdfStorageUrl(storageUrl);
+          } else {
+            // Upload failed — flag it so the done screen can show a retry option
+            setNiStorageUploadFailed(true);
+          }
         }
         setNiPdfBase64(result.pdf_base64 || null);
-        // Drive URL is returned immediately at generate time (not just after send)
-        if (result.drive_url) setInstallDriveUrl(result.drive_url);
       } else {
         alert('Failed to generate PDF: ' + (result.error || 'Unknown error'));
         setLoading(false);
@@ -2780,6 +2785,19 @@ function App() {
     setSendingEmail(false);
   }
 
+  async function retryStorageUpload() {
+    if (!niPdfBase64 || !currentJobId) return;
+    setRetryingUpload(true);
+    const storageUrl = await window.TFB.uploadPdf(niPdfBase64, `proposals/${currentJobId}.pdf`);
+    if (storageUrl) {
+      setNiPdfStorageUrl(storageUrl);
+      setNiStorageUploadFailed(false);
+    } else {
+      alert('Upload still failing. Check your internet connection and try again.');
+    }
+    setRetryingUpload(false);
+  }
+
   // ── Done screen ────────────────────────────────────────────────────────────
   if (done) {
     return (
@@ -2842,28 +2860,51 @@ function App() {
             {/* Preview & Send buttons */}
             {(niPdfStorageUrl || pdfId) ? (
               <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                {/* Storage upload failed banner — shown when Firebase upload didn't work */}
+                {niStorageUploadFailed && !niPdfStorageUrl && (
+                  <div style={{background:'#fef3c7',border:'1.5px solid #f59e0b',borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+                    <span style={{fontSize:14,color:'#92400e',fontWeight:600}}>Preview link unavailable — upload failed</span>
+                    <button onClick={retryStorageUpload} disabled={retryingUpload}
+                      style={{padding:'8px 14px',borderRadius:8,border:'none',background:'#f59e0b',color:'white',fontWeight:700,fontSize:13,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      {retryingUpload ? 'Retrying…' : 'Retry Upload'}
+                    </button>
+                  </div>
+                )}
                 <div style={{display:'flex',gap:10}}>
+                  {niPdfStorageUrl ? (
+                    <a
+                      href={niPdfStorageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        flex:1,display:'block',padding:'16px 10px',borderRadius:14,
+                        background:'linear-gradient(135deg,#1a3a6b,#2563eb)',
+                        color:'white',textAlign:'center',fontSize:16,fontWeight:700,
+                        textDecoration:'none',boxShadow:'0 4px 16px rgba(37,99,235,0.35)'
+                      }}
+                    >
+                      📄 Preview
+                    </a>
+                  ) : (
+                    <button disabled
+                      style={{
+                        flex:1,padding:'16px 10px',borderRadius:14,
+                        background:'#cbd5e1',color:'white',textAlign:'center',fontSize:16,fontWeight:700,
+                        border:'none',cursor:'default'
+                      }}
+                    >
+                      📄 Preview
+                    </button>
+                  )}
                   <a
-                    href={niPdfStorageUrl || `https://toomey-backend-production.up.railway.app/preview-pdf/${pdfId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={niPdfStorageUrl || '#'}
+                    download={niPdfStorageUrl ? undefined : undefined}
                     style={{
                       flex:1,display:'block',padding:'16px 10px',borderRadius:14,
-                      background:'linear-gradient(135deg,#1a3a6b,#2563eb)',
+                      background: niPdfStorageUrl ? 'linear-gradient(135deg,#166534,#16a34a)' : '#cbd5e1',
                       color:'white',textAlign:'center',fontSize:16,fontWeight:700,
-                      textDecoration:'none',boxShadow:'0 4px 16px rgba(37,99,235,0.35)'
-                    }}
-                  >
-                    📄 Preview
-                  </a>
-                  <a
-                    href={niPdfStorageUrl || `https://toomey-backend-production.up.railway.app/download-pdf/${pdfId}`}
-                    download
-                    style={{
-                      flex:1,display:'block',padding:'16px 10px',borderRadius:14,
-                      background:'linear-gradient(135deg,#166534,#16a34a)',
-                      color:'white',textAlign:'center',fontSize:16,fontWeight:700,
-                      textDecoration:'none',boxShadow:'0 4px 16px rgba(22,163,74,0.35)'
+                      textDecoration:'none',boxShadow: niPdfStorageUrl ? '0 4px 16px rgba(22,163,74,0.35)' : 'none',
+                      pointerEvents: niPdfStorageUrl ? 'auto' : 'none'
                     }}
                   >
                     ⬇ Download
